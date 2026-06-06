@@ -5,3 +5,4 @@ PROMPT_GUIDE.md
 output/
 conversations/
 .env
+data/

@@ -32,6 +32,7 @@ python -m parser --input PATH --output-dir PATH
 project-root/
 ├── src/
 │   ├── parser.py          Claude.ai 내보내기 JSON → session.json 변환
+│   ├── models.py          Pydantic 데이터 스키마 (블록 타입 포함)
 │   ├── server.py          HTTP 서버 + API 라우팅
 │   ├── indexer.py         fastembed 임베딩 + 벡터 검색
 │   ├── knowledge_graph.py 엔티티/관계 추출 + SQLite KG (벡터 엔티티 포함)
@@ -39,10 +40,14 @@ project-root/
 │   └── viewer/
 │       ├── index.html
 │       ├── style.css
-│       └── app.js
+│       ├── app.js
+│       └── renderers/     블록 타입별 렌더러 (text, thinking, tool_use 등)
+├── notebooks/
+│   └── eda.ipynb          데이터 구조 탐색 + 블록 타입 분포 분석
 ├── conversations/                변환된 세션 데이터 (gitignore)
 ├── tests/
 ├── pyproject.toml
+├── README.md
 └── .env                   Groq API 키 (gitignore)
 ```
 
@@ -75,7 +80,18 @@ Claude.ai 설정 → 데이터 내보내기 → 다운로드한 JSON 파일 구�
 }
 ```
 
-Claude.ai는 tool_use 블록이 없으므로 text/thinking만 존재.
+실제 내보내기 데이터에는 5가지 블록 타입이 존재:
+
+| 타입 | 필드 | 설명 |
+|------|------|------|
+| `text` | `text` | 일반 텍스트 응답 |
+| `thinking` | `thinking` | Extended thinking 내용 (`text` 필드 아님 주의) |
+| `tool_use` | `name`, `input` | Artifacts, 웹 검색 등 도구 호출 |
+| `tool_result` | `name`, `content[]`, `is_error` | 도구 실행 결과 |
+| `token_budget` | `remaining` | 메타데이터 (RAG 입력 제외) |
+
+미래에 새 타입 추가 시 `{ "type": "...", "raw": {...} }` 폴백으로 보존.
+RAG/AI 채팅 컨텍스트는 `text` 블록만 사용.
 
 ---
 
@@ -294,11 +310,12 @@ Python이 rate limit 헤더를 읽어 응답 body에 `rate_limit` 필드로 포�
 ## 구현 우선순위
 
 ```
-Phase 1  파서 (실제 내보내기 파일 확인 후 작성)
-Phase 2  서버 + 기본 뷰어 (세션 목록 + 대화 렌더링)
+Phase 0  EDA (데이터 구조 탐색, 블록 타입 분포, 노트북)
+Phase 1  파서 + Pydantic 스키마 (models.py)
+Phase 2  서버 + 기본 뷰어 (세션 목록 + 대화 렌더링 + 블록 타입 필터)
 Phase 3  코어 RAG (토픽 분할 + 임베딩 + 인접 게이팅 + 벡터 KG)
 Phase 4  AI 채팅 (쿼리 라우팅 + retrieval 파이프라인 + 대화 저장)
-Phase 5  RAG 평가 파이프라인 (모드 비교 + LLM-as-judge)
+Phase 5  RAG 평가 파이프라인 (모드 비교 + LLM-as-judge + 결과 시각화)
 Phase 6  Dense X + HyDE (평가 결과 기반으로 필요한 것만 구현)
 Phase 7  UI 완성 (청크 패널 + KG 패널 + 평가 패널 + 설정 패널)
 ```
