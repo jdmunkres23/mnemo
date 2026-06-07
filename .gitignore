@@ -6,3 +6,10 @@ output/
 conversations/
 .env
 data/
+
+.venv/
+__pycache__/
+*.egg-info/
+.ipynb_checkpoints/
+
+docs/phases/
