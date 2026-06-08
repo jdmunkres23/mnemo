@@ -43,7 +43,13 @@ project-root/
 │       ├── app.js
 │       └── renderers/     블록 타입별 렌더러 (text, thinking, tool_use 등)
 ├── notebooks/
-│   └── eda.ipynb          데이터 구조 탐색 + 블록 타입 분포 분석
+│   ├── phase0/            EDA (데이터 구조 탐색)
+│   ├── phase1/            파서 + Pydantic 스키마 실습
+│   ├── phase2/            서버 + 뷰어 실습
+│   ├── phase3/            코어 RAG 실습 (임베딩, KG, 인접 게이팅)
+│   ├── phase4/            AI 채팅 실습
+│   └── phase5/            RAG 평가 실습
+│   (각 phase 폴더: 노트북 파일들 + feedback.md)
 ├── conversations/                변환된 세션 데이터 (gitignore)
 ├── tests/
 ├── pyproject.toml
@@ -55,10 +61,9 @@ project-root/
 
 ## 데이터 구조
 
-### Claude.ai 내보내기 포맷 (파서 작성 전 실제 파일 확인 필요)
+### Claude.ai 내보내기 포맷
 
-Claude.ai 설정 → 데이터 내보내기 → 다운로드한 JSON 파일 구조를 먼저 확인하고
-`parser.py`를 작성한다. 정확한 필드명은 실제 파일 기준.
+실제 파일 기준으로 확인 완료 (Phase 0 EDA). 정확한 필드명은 `docs/memo.md` Phase 0 결론 참고.
 
 ### 내부 session.json 스키마
 

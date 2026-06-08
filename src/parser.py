@@ -43,32 +43,30 @@ def parse_block(raw: dict) -> Block:
     if block_type == "text":
         # TODO: TextBlock 반환
         # 힌트: raw["text"] 그대로 사용
-        pass  # TODO
+        return TextBlock(type='text', text=raw['text'])
 
     elif block_type == "thinking":
-        # TODO: ThinkingBlock 반환
-        # 힌트: raw["thinking"] → ThinkingBlock의 text 필드로 정규화
-        pass  # TODO
+        return ThinkingBlock(type="thinking", text=raw["thinking"])
 
     elif block_type == "tool_use":
         # TODO: ToolUseBlock 반환
         # 힌트: name, input 필드 추출
-        pass  # TODO
+        return ToolUseBlock(type='tool_use', name=raw['name'], input=raw['input'])
 
     elif block_type == "tool_result":
         # TODO: ToolResultBlock 반환
         # 힌트: content는 리스트 → ToolResultContentItem 리스트로 변환
         #        is_error 기본값은 False
-        pass  # TODO
+        return ToolResultBlock(type='tool_result', name=raw['name'], content=raw['content'], is_error=raw.get('is_error', False))
 
     elif block_type == "token_budget":
         # TODO: TokenBudgetBlock 반환
         # 힌트: remaining 필드 (None일 수 있음)
-        pass  # TODO
+        return TokenBudgetBlock(type='token_budget', remaining=raw.get('remaining'))
 
     else:
         # TODO: FallbackBlock 반환 (손실 없이 raw 전체 보존)
-        pass  # TODO
+        return FallbackBlock(type=raw['type'], raw=raw)
 
 
 def parse_message(msg: dict) -> Turn:
@@ -81,7 +79,9 @@ def parse_message(msg: dict) -> Turn:
     """
     # TODO: sender → role 변환 후 content 블록 목록을 parse_block()으로 변환
     # 힌트: SENDER_TO_ROLE 딕셔너리 사용
-    pass  # TODO
+    role = SENDER_TO_ROLE[msg['sender']]
+    blocks = [parse_block(b) for b in msg['content']]
+    return Turn(role=role, blocks=blocks)
 
 
 def parse_conversation(conv: dict) -> Session:
@@ -94,7 +94,11 @@ def parse_conversation(conv: dict) -> Session:
     """
     # TODO: uuid → session_id, name → title
     #        chat_messages 목록을 parse_message()로 변환해 turns 생성
-    pass  # TODO
+    session_id = conv['uuid']
+    title = conv['name']
+    turns = [parse_message(t) for t in conv['chat_messages']]
+    return Session(session_id=session_id, title=title, turns = turns, created_at=conv['created_at'], updated_at=conv['updated_at'])
+
 
 
 def parse_export(export_path: str | Path, output_dir: str | Path) -> list[Path]:
@@ -117,6 +121,9 @@ def parse_export(export_path: str | Path, output_dir: str | Path) -> list[Path]:
     for conv in conversations:
         # TODO: parse_conversation() 호출 후 session.model_dump_json(indent=2)으로 저장
         # 힌트: output_dir / f"{session.session_id}.json"
-        pass  # TODO
+        session = parse_conversation(conv)
+        out_path = output_dir / f"{session.session_id}.json"
+        out_path.write_text(session.model_dump_json(indent=2), encoding="utf-8")
+        saved.append(out_path)
 
     return saved
