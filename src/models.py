@@ -22,7 +22,7 @@ class TextBlock(BaseModel):
 
 class ThinkingBlock(BaseModel):
     type: Literal["thinking"]
-    text: str  # 원본 'thinking' 필드를 'text'로 정규화 (파서에서 변환)
+    thinking: str
 
     # TODO (노트북 실습 1): 노트북에서 구현 후 여기에 옮기세요.
 

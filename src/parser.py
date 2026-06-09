@@ -46,7 +46,7 @@ def parse_block(raw: dict) -> Block:
         return TextBlock(type='text', text=raw['text'])
 
     elif block_type == "thinking":
-        return ThinkingBlock(type="thinking", text=raw["thinking"])
+        return ThinkingBlock(type="thinking", thinking=raw["thinking"])
 
     elif block_type == "tool_use":
         # TODO: ToolUseBlock 반환
