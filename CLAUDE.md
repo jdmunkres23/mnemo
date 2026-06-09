@@ -15,12 +15,12 @@ Claude.ai 대화 내보내기 데이터를 파싱해 브라우저에서 열람�
 ## CLI
 
 ```bash
-python -m viewer                         # 현재 폴더 conversations/ 기준 뷰어 실행
+python -m viewer                         # 현재 폴더 conversations_learning/ 기준 뷰어 실행
 python -m viewer --port 9000
 python -m viewer --no-browser
 python -m viewer --data-dir PATH         # 데이터 디렉토리 직접 지정
 
-python -m parser --input PATH            # Claude.ai 내보내기 JSON → conversations/ 변환
+python -m parser --input PATH            # Claude.ai 내보내기 JSON → conversations_learning/ 변환
 python -m parser --input PATH --output-dir PATH
 ```
 
@@ -50,7 +50,7 @@ project-root/
 │   ├── phase4/            AI 채팅 실습
 │   └── phase5/            RAG 평가 실습
 │   (각 phase 폴더: 노트북 파일들 + feedback.md)
-├── conversations/                변환된 세션 데이터 (gitignore)
+├── conversations_learning/       변환된 세션 데이터 (gitignore)
 ├── tests/
 ├── pyproject.toml
 ├── README.md
@@ -261,7 +261,7 @@ python -m evaluator --load-judgments PATH            # 기존 판정으로 채�
 ```
 GET  /viewer/*                      → 정적 파일 (패키지 번들)
 GET  /conversations/*                      → 변환된 세션 파일
-GET  /api/sessions                  → conversations/ 세션 목록
+GET  /api/sessions                  → conversations_learning/ 세션 목록
 GET  /api/session/<id>              → session.json 반환
 GET  /api/index-status?session_id=  → 인덱싱 상태 + topics 배열
 GET  /api/kg-status?session_id=     → KG 상태 + 엔티티 수
@@ -340,6 +340,6 @@ Phase 7  UI 완성 (청크 패널 + KG 패널 + 평가 패널 + 설정 패널)
 ## 제약 조건
 
 - 절대 경로 하드코딩 금지
-- `conversations/`, `.env` gitignore (대화 내용, API 키)
+- `conversations_learning/`, `conversations_solution/`, `data/`, `.env` gitignore (대화 내용, API 키)
 - API 키는 `.env` 또는 설정 파일에만 저장
 - Anthropic/Claude 관련 상표·디자인 요소 금지
