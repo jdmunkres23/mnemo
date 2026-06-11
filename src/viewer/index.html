@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mnemo</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+<link rel="stylesheet" href="/viewer/style.css">
+</head>
+<body>
+
+<!-- 로딩 화면 -->
+<div class="loading-screen" id="loadingScreen">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:40px">
+    <!-- v4-02 contour flower + short stem stub -->
+    <svg width="72" height="72" viewBox="0 0 100 100" fill="none" style="animation:spin 4s linear infinite;transform-origin:50% 52%">
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path transform="rotate(-35,50,52)"  d="M50,52 C46,42 44,28 50.5,16.5" stroke="#a855f7" stroke-width="1.1"/>
+        <path transform="rotate(-35,50,52)"  d="M49.5,16 C56,28 54,42 50,52"   stroke="#9d5ef7" stroke-width="1.0" opacity="0.8"/>
+        <path transform="rotate(35,50,52)"   d="M50,52 C46,42 44,28 50.5,16.5" stroke="#a855f7" stroke-width="1.1"/>
+        <path transform="rotate(35,50,52)"   d="M49.5,16 C56,28 54,42 50,52"   stroke="#9d5ef7" stroke-width="1.0" opacity="0.8"/>
+        <path transform="rotate(-100,50,52)" d="M50,52 C46,42 44,28 50.5,16.5" stroke="#8b5cf6" stroke-width="1.0" opacity="0.7"/>
+        <path transform="rotate(-100,50,52)" d="M49.5,16 C56,28 54,42 50,52"   stroke="#8b5cf6" stroke-width="0.9" opacity="0.6"/>
+        <path transform="rotate(100,50,52)"  d="M50,52 C46,42 44,28 50.5,16.5" stroke="#8b5cf6" stroke-width="1.0" opacity="0.7"/>
+        <path transform="rotate(100,50,52)"  d="M49.5,16 C56,28 54,42 50,52"   stroke="#8b5cf6" stroke-width="0.9" opacity="0.6"/>
+        <path transform="rotate(180,50,52)"  d="M50,52 C44,40 41.5,25 50.5,12.5" stroke="#b06ff8" stroke-width="1.1"/>
+        <path transform="rotate(180,50,52)"  d="M49.5,12 C58.5,25 56,40 50,52"  stroke="#a855f7" stroke-width="1.0" opacity="0.85"/>
+        <path transform="rotate(-35,50,52)"  d="M50,52 C47.5,43.5 46,30 50,19"  stroke="#ddd6fe" stroke-width="0.6" opacity="0.4"/>
+        <path transform="rotate(35,50,52)"   d="M50,52 C47.5,43.5 46,30 50,19"  stroke="#ddd6fe" stroke-width="0.6" opacity="0.4"/>
+        <path transform="rotate(-100,50,52)" d="M50,52 C47.5,43.5 46,30 50,19"  stroke="#ddd6fe" stroke-width="0.6" opacity="0.3"/>
+        <path transform="rotate(100,50,52)"  d="M50,52 C47.5,43.5 46,30 50,19"  stroke="#ddd6fe" stroke-width="0.6" opacity="0.3"/>
+        <path transform="rotate(180,50,52)"  d="M50,52 C45.5,41.5 43.5,27.5 50,15.5" stroke="#ddd6fe" stroke-width="0.6" opacity="0.35"/>
+      </g>
+      <circle cx="50" cy="52" r="3.5" fill="none" stroke="#e9d5ff" stroke-width="0.85" opacity="0.8"/>
+      <circle cx="50" cy="52" r="1"   fill="none" stroke="#e9d5ff" stroke-width="0.85" opacity="0.9"/>
+    </svg>
+    <div style="font-size:22px;font-weight:200;letter-spacing:10px;color:#c084fc">Mnemo</div>
+    <div style="font-size:11px;color:#3f3f5a;letter-spacing:1px">A memory garden for your AI conversations</div>
+  </div>
+  <div style="font-size:15px;color:var(--text2)" id="loadingMsg">대화 불러오는 중...</div>
+  <div class="loading-error" id="loadingError" style="display:none"></div>
+</div>
+
+<!-- SEARCH -->
+<div class="search-overlay" id="searchOverlay" onclick="if(event.target===this)closeSearch()">
+  <div class="search-box">
+    <div class="search-input-row">
+      <i class="ti ti-search" style="color:var(--text3);font-size:16px"></i>
+      <input id="searchInput" placeholder="대화 제목 검색... (Ctrl+K)" oninput="doSearch(this.value)" autocomplete="off">
+      <button class="hico" onclick="closeSearch()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="search-results" id="searchResults"><div class="sr-empty">검색어를 입력하세요</div></div>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none">
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-top">
+    <button class="logo-btn" id="logoBtn" title="A memory garden for your AI conversations">Mnemo</button>
+    <button class="hico" id="sbToggle"><i class="ti ti-layout-sidebar"></i></button>
+  </div>
+  <div class="sb-nav">
+    <button class="nav-item" id="newChatBtn"><i class="ti ti-plus"></i><span class="nav-label">새 채팅</span></button>
+    <button class="nav-item" onclick="openSearch()"><i class="ti ti-search"></i><span class="nav-label">검색</span></button>
+    <button class="nav-item"><i class="ti ti-message"></i><span class="nav-label">채팅</span></button>
+    <button class="nav-item"><i class="ti ti-layout-grid"></i><span class="nav-label">프로젝트</span></button>
+    <button class="nav-item"><i class="ti ti-file-text"></i><span class="nav-label">아티팩트</span></button>
+  </div>
+  <div class="sb-history" id="sbHistory">
+    <div class="sb-lbl">불러오는 중...</div>
+  </div>
+  <div class="sb-foot">
+    <div class="sb-foot-row">
+      <div class="user-row">
+        <div class="avatar">사</div>
+        <div><div class="uname">사용자</div><div class="uplan">로컬 뷰어</div></div>
+      </div>
+      <div class="foot-icons">
+        <button class="hico"><i class="ti ti-settings"></i></button>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="topbar-sb-btn" id="topbarSbBtn"><i class="ti ti-layout-sidebar"></i></button>
+      <button class="chat-title-btn"><span id="chatTitleText">대화 뷰어</span><i class="ti ti-chevron-down" style="font-size:13px;color:var(--text3)"></i></button>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-pill" onclick="openSearch()"><i class="ti ti-search" style="font-size:14px"></i> 검색</button>
+      <button class="icon-pill" id="aiChatBtn" onclick="toggleChatPanel()"><i class="ti ti-message-bolt" style="font-size:14px"></i> AI 채팅</button>
+      <button class="hico" id="topNewChat"><i class="ti ti-edit"></i></button>
+    </div>
+  </div>
+  <div class="content">
+    <!-- 웰컴 화면 -->
+    <div class="welcome-wrap" id="welcomeWrap">
+      <div class="welcome-title" style="flex-direction:column;gap:14px;text-align:center">
+        <svg width="56" height="56" viewBox="0 0 100 100" fill="none">
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path transform="rotate(-35,50,52)"  d="M50,52 C46,42 44,28 50.5,16.5" stroke="#a855f7" stroke-width="1.1"/>
+            <path transform="rotate(-35,50,52)"  d="M49.5,16 C56,28 54,42 50,52"   stroke="#9d5ef7" stroke-width="1.0" opacity="0.8"/>
+            <path transform="rotate(35,50,52)"   d="M50,52 C46,42 44,28 50.5,16.5" stroke="#a855f7" stroke-width="1.1"/>
+            <path transform="rotate(35,50,52)"   d="M49.5,16 C56,28 54,42 50,52"   stroke="#9d5ef7" stroke-width="1.0" opacity="0.8"/>
+            <path transform="rotate(-100,50,52)" d="M50,52 C46,42 44,28 50.5,16.5" stroke="#8b5cf6" stroke-width="1.0" opacity="0.7"/>
+            <path transform="rotate(-100,50,52)" d="M49.5,16 C56,28 54,42 50,52"   stroke="#8b5cf6" stroke-width="0.9" opacity="0.6"/>
+            <path transform="rotate(100,50,52)"  d="M50,52 C46,42 44,28 50.5,16.5" stroke="#8b5cf6" stroke-width="1.0" opacity="0.7"/>
+            <path transform="rotate(100,50,52)"  d="M49.5,16 C56,28 54,42 50,52"   stroke="#8b5cf6" stroke-width="0.9" opacity="0.6"/>
+            <path transform="rotate(180,50,52)"  d="M50,52 C44,40 41.5,25 50.5,12.5" stroke="#b06ff8" stroke-width="1.1"/>
+            <path transform="rotate(180,50,52)"  d="M49.5,12 C58.5,25 56,40 50,52"  stroke="#a855f7" stroke-width="1.0" opacity="0.85"/>
+            <path transform="rotate(-35,50,52)"  d="M50,52 C47.5,43.5 46,30 50,19"  stroke="#ddd6fe" stroke-width="0.6" opacity="0.4"/>
+            <path transform="rotate(35,50,52)"   d="M50,52 C47.5,43.5 46,30 50,19"  stroke="#ddd6fe" stroke-width="0.6" opacity="0.4"/>
+            <path transform="rotate(-100,50,52)" d="M50,52 C47.5,43.5 46,30 50,19"  stroke="#ddd6fe" stroke-width="0.6" opacity="0.3"/>
+            <path transform="rotate(100,50,52)"  d="M50,52 C47.5,43.5 46,30 50,19"  stroke="#ddd6fe" stroke-width="0.6" opacity="0.3"/>
+            <path transform="rotate(180,50,52)"  d="M50,52 C45.5,41.5 43.5,27.5 50,15.5" stroke="#ddd6fe" stroke-width="0.6" opacity="0.35"/>
+          </g>
+          <circle cx="50" cy="52" r="3.5" fill="none" stroke="#e9d5ff" stroke-width="0.85" opacity="0.8"/>
+          <circle cx="50" cy="52" r="1"   fill="none" stroke="#e9d5ff" stroke-width="0.85" opacity="0.9"/>
+        </svg>
+        <div>
+          <div style="font-size:26px;font-weight:600;letter-spacing:-0.5px;color:var(--text)">Mnemo</div>
+          <div style="font-size:14px;font-weight:400;color:var(--text2);margin-top:5px">A memory garden for your AI conversations</div>
+        </div>
+      </div>
+      <div class="input-outer">
+        <div class="input-box">
+          <textarea id="wTa" placeholder="오늘 어떤 도움을 드릴까요?" rows="1"></textarea>
+          <div class="input-bar">
+            <div class="input-bar-l"><button class="plus-btn"><i class="ti ti-plus"></i></button></div>
+            <div class="input-bar-r">
+              <button class="model-btn">AI 채팅 준비 중<i class="ti ti-chevron-down" style="font-size:11px"></i></button>
+              <button class="send-btn" id="wSend"><i class="ti ti-arrow-up"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="quick-pills">
+          <button class="qpill" onclick="openSearch()"><i class="ti ti-search"></i> 대화 검색</button>
+          <button class="qpill"><i class="ti ti-clock"></i> 최근 대화</button>
+          <button class="qpill"><i class="ti ti-sparkles"></i> AI 채팅 (준비 중)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 대화 뷰어 -->
+    <div class="chat-col" id="chatCol" style="display:none">
+      <div class="chat-scroll" id="chatScroll">
+        <div class="chat-inner" id="chatInner"></div>
+      </div>
+      <button class="scroll-fab" id="scrollFab" onclick="chatScroll.scrollTop=chatScroll.scrollHeight"><i class="ti ti-arrow-down"></i></button>
+    </div>
+  </div>
+</main>
+
+<!-- AI 채팅 패널 (껍데기) -->
+<aside class="ai-chat-panel hidden" id="aiChatPanel">
+  <div class="ai-panel-top">
+    <span class="ai-panel-title">AI 채팅</span>
+    <button class="hico" onclick="toggleChatPanel()"><i class="ti ti-x"></i></button>
+  </div>
+  <div class="ai-panel-body">
+    <i class="ti ti-message-bolt"></i>
+    <p>AI 채팅 기능은<br>Phase 4에서 구현 예정입니다.</p>
+  </div>
+</aside>
+
+</div>
+
+<script src="/viewer/renderers/text.js"></script>
+<script src="/viewer/renderers/thinking.js"></script>
+<script src="/viewer/renderers/tool.js"></script>
+<script src="/viewer/app.js"></script>
+</body>
+</html>
