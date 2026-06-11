@@ -49,7 +49,7 @@ project-root/
 │   ├── phase3/            코어 RAG 실습 (임베딩, KG, 인접 게이팅)
 │   ├── phase4/            AI 채팅 실습
 │   └── phase5/            RAG 평가 실습
-│   (각 phase 폴더: 노트북 파일들 + feedback.md)
+│   (각 phase 폴더: [주제]_theory.md + [번호]_[주제]_notebook.md, AI 무관 영역은 _overview.md)
 ├── conversations_learning/       변환된 세션 데이터 (gitignore)
 ├── tests/
 ├── pyproject.toml
