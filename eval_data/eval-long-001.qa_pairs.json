@@ -1,0 +1,190 @@
+[
+  {
+    "question": "LoRA 어댑터의 rank와 alpha를 각각 얼마로 잡았나요?",
+    "expected": "rank 16, alpha 32로 잡았습니다.",
+    "source_turns": [
+      1
+    ],
+    "type": "paraphrase",
+    "key_facts": [
+      "16",
+      "32"
+    ]
+  },
+  {
+    "question": "학습 시 최대 시퀀스 길이를 얼마로 설정했나요?",
+    "expected": "max_seq_len 2048로 설정했습니다.",
+    "source_turns": [
+      3
+    ],
+    "type": "single",
+    "key_facts": [
+      "2048"
+    ]
+  },
+  {
+    "question": "per-device 배치와 그래디언트 누적을 곱한 유효 배치 크기는 얼마였나요?",
+    "expected": "32입니다 (per_device 4 × grad_accum 8).",
+    "source_turns": [
+      5
+    ],
+    "type": "paraphrase",
+    "key_facts": [
+      "32"
+    ]
+  },
+  {
+    "question": "처음에 설정한 학습률과 스케줄러 종류는 무엇이었나요?",
+    "expected": "학습률 2e-4, cosine 스케줄러로 시작했습니다.",
+    "source_turns": [
+      7
+    ],
+    "type": "single",
+    "key_facts": [
+      "2e-4",
+      "cosine"
+    ]
+  },
+  {
+    "question": "학습 손실이 초반에 튀어(spike) NaN이 난 원인과, 그걸 잡으려고 조정한 설정들은 무엇이었나요?",
+    "expected": "초기 학습률이 높고 warmup이 없던 게 원인이며, warmup_ratio 0.03 + 학습률 1e-4 하향 + bf16 전환 + max_grad_norm 1.0 클리핑으로 잡았습니다.",
+    "source_turns": [
+      9,
+      11,
+      13
+    ],
+    "type": "multihop",
+    "key_facts": [
+      "0.03",
+      "1e-4",
+      "bf16",
+      "1.0"
+    ]
+  },
+  {
+    "question": "학습 중 OOM을 해결하려고 켠 설정은 무엇이었나요?",
+    "expected": "gradient_checkpointing을 켰습니다(bf16과 함께).",
+    "source_turns": [
+      15
+    ],
+    "type": "single",
+    "key_facts": [
+      "gradient_checkpointing"
+    ]
+  },
+  {
+    "question": "평가 정확도가 0.99로 비정상적으로 높았던 원인과 그 처리 방법은 무엇이었나요?",
+    "expected": "train/test 데이터 누수(중복 샘플)가 원인이며, 정규화 후 sha1로 중복 제거한 다음 분할하도록 순서를 바꿔 해결했습니다.",
+    "source_turns": [
+      21,
+      23,
+      25
+    ],
+    "type": "multihop",
+    "key_facts": [
+      "누수",
+      "sha1"
+    ]
+  },
+  {
+    "question": "중복 제거는 무엇을 기준으로 했고, 데이터 누수로 몇 건 정도가 새어 있었나요?",
+    "expected": "정규화한 텍스트의 sha1 해시를 기준으로 했고, 약 1,800건이 train/test에 겹쳐 있었습니다.",
+    "source_turns": [
+      23,
+      25
+    ],
+    "type": "single",
+    "key_facts": [
+      "sha1",
+      "1800"
+    ]
+  },
+  {
+    "question": "전체 데이터셋 규모는 몇 건이었나요?",
+    "expected": "42,000건이었습니다.",
+    "source_turns": [
+      24,
+      25
+    ],
+    "type": "single",
+    "key_facts": [
+      "42000"
+    ]
+  },
+  {
+    "question": "데이터 누수를 제거한 뒤 평가 정확도는 얼마로 바뀌었나요?",
+    "expected": "0.99에서 0.86으로 떨어졌습니다(이게 실제 성능).",
+    "source_turns": [
+      25,
+      27
+    ],
+    "type": "multihop",
+    "key_facts": [
+      "0.86"
+    ]
+  },
+  {
+    "question": "모델이 답을 너무 일찍 끝내던 토크나이저 문제의 원인과 해결책은 무엇이었나요?",
+    "expected": "pad_token이 eos_token과 같은데 라벨 마스킹을 안 해 패딩(=eos)에까지 loss가 걸린 게 원인이며, pad 토큰을 분리하고 라벨을 -100으로 마스킹(padding_side right)해 해결했습니다.",
+    "source_turns": [
+      29,
+      31
+    ],
+    "type": "multihop",
+    "key_facts": [
+      "eos",
+      "-100"
+    ]
+  },
+  {
+    "question": "LoRA를 병합한 뒤 4-bit(nf4)로 양자화했을 때 정확도는 얼마였나요?",
+    "expected": "0.83이었습니다 (bf16은 0.86).",
+    "source_turns": [
+      37,
+      38
+    ],
+    "type": "single",
+    "key_facts": [
+      "0.83"
+    ]
+  },
+  {
+    "question": "추론 서빙은 무엇으로, 몇 번 포트에 띄웠나요?",
+    "expected": "vLLM으로 8001 포트에 띄웠습니다.",
+    "source_turns": [
+      39,
+      40
+    ],
+    "type": "single",
+    "key_facts": [
+      "vllm",
+      "8001"
+    ]
+  },
+  {
+    "question": "생성이 멈추지 않고 같은 말을 반복하던 문제의 원인과 해결책은 무엇이었나요?",
+    "expected": "서빙 chat template이 학습 포맷과 달라 eos가 빠진 게 원인이며, 템플릿을 학습과 통일(eos 포함)하고 stop 토큰 지정 + repetition_penalty 1.1을 더해 해결했습니다.",
+    "source_turns": [
+      41,
+      43
+    ],
+    "type": "multihop",
+    "key_facts": [
+      "eos",
+      "repetition_penalty"
+    ]
+  },
+  {
+    "question": "서빙 지연을 줄이려고 최대 컨텍스트 길이(max_model_len)를 얼마로 낮췄나요?",
+    "expected": "4096에서 2048로 낮췄습니다.",
+    "source_turns": [
+      47,
+      49
+    ],
+    "type": "paraphrase",
+    "key_facts": [
+      "4096",
+      "2048"
+    ]
+  }
+]
