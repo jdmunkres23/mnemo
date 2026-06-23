@@ -26,7 +26,7 @@ python -m parser --input PATH --output-dir PATH
 python -m evaluator --session PATH --modes baseline,vector
 python -m evaluator --session PATH --modes vector,vector_adjacent,vector_kg
 python -m evaluator --session PATH --qa-pairs PATH   # 기존 QA 쌍 재사용
-python -m evaluator --session PATH --max-chars 0     # 컨텍스트 자르기 없음 (짧은 대화용)
+python -m evaluator --session PATH --max-chars 0     # 청크 크기 제한 없음 — 전체를 하나의 청크로 (짧은 대화용)
 python -m evaluator --no-judge                       # 답변만 생성 (Claude 외부 채점용)
 python -m evaluator --load-judgments PATH            # 기존 판정으로 채점만
 ```
@@ -126,11 +126,11 @@ MVP에서 시작해 평가 결과를 보고 단계적으로 개선한다.
 
 ```
 Phase 3 — baseline
-  전체 대화 텍스트 → Groq → 답변
-  문제: 긴 대화에서 토큰 초과 + rate limit 빈발
+  고정 크기(N글자) 청크 분할 + fastembed 벡터 검색 → 관련 청크 → Groq → 답변
+  문제: 청크 경계가 주제를 무시해 관련 내용이 잘리거나 분산됨
     ↓
 Phase 4 — vector
-  토픽 분할 + 요약 임베딩 → 관련 청크만 Groq에 전달
+  토픽 기반 청크 분할 + 요약 임베딩 + fastembed 벡터 검색 → 관련 청크 → Groq → 답변
   평가: baseline 대비 Hit Rate + Correctness + Token Usage 비교
     ↓
 Phase 5 — vector_adjacent → vector_kg (greedy sequential)
@@ -139,6 +139,18 @@ Phase 5 — vector_adjacent → vector_kg (greedy sequential)
     ↓
 Phase 6 — dense_x / hyde (선택)
   Phase 5 평가 결과에서 개선 여지가 있을 때만 구현
+```
+
+### 인덱싱 흐름 (Phase 3)
+
+```
+session.json
+  → 고정 크기(N글자)로 청크 분할
+      turns를 순서대로 이어붙이다 N글자 초과 시 새 청크 시작
+  → fastembed.embed(chunk_text)
+      multilingual-e5-large, ONNX CPU 추론
+  → session_index.json 저장
+      { text, embedding, turn_start, turn_end }
 ```
 
 ### 인덱싱 흐름 (Phase 4~)
@@ -306,8 +318,8 @@ QA 쌍 스키마 (`eval_data/eval-*.qa_pairs.json`):
 
 | 모드 | 도입 Phase | 검색 방식 |
 |------|-----------|----------|
-| `baseline` | Phase 3 | 전체 텍스트를 컨텍스트로 사용 |
-| `vector` | Phase 4 | 코사인 유사도 top_k |
+| `baseline` | Phase 3 | 고정 크기 청크 + 벡터 검색 |
+| `vector` | Phase 4 | 토픽 기반 청크 + 벡터 검색 |
 | `vector_adjacent` | Phase 5 | vector + 인접 게이팅 |
 | `vector_kg` | Phase 5 | vector_adjacent + 벡터 KG |
 | `hyde` | Phase 6 | HyDE 쿼리 확장 + vector |
@@ -425,8 +437,8 @@ Phase 1  파서 + Pydantic 스키마
 Phase 2  서버 + 기본 뷰어
          세션 목록 + 대화 렌더링 + 블록 타입 필터
 
-Phase 3  MVP RAG 채팅
-         전체 대화 텍스트 → Groq → 답변
+Phase 3  기본 RAG 체험
+         고정 크기(N글자) 청크 분할 + fastembed 벡터 검색 → 관련 청크 → Groq 답변
          세션별 채팅 기록 저장/복원, 모델 목록 동적 조회
          대화 이력 유지 (multi-turn), rate limit 배지
          baseline 평가 파이프라인 (src/evaluator.py)
