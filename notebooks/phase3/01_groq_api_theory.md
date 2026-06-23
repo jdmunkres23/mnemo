@@ -14,7 +14,29 @@
 
 ---
 
-## 2. REST API 외부 호출 패턴
+## 2. HTTP 메서드 — GET vs POST
+
+HTTP 요청에는 종류가 있다. 이 프로젝트에서 쓰는 두 가지:
+
+| | GET | POST |
+|---|---|---|
+| 용도 | 데이터를 달라고 요청 | 데이터를 보내면서 요청 |
+| body | 없음 | 있음 (`data=payload`) |
+| 예시 | 모델 목록 조회 | 채팅 메시지 전송 |
+
+`urllib.request.Request`는 `data`가 있으면 자동으로 POST, 없으면 자동으로 GET:
+
+```python
+# POST — data 있음
+urllib.request.Request(url, data=payload, headers=...)
+
+# GET — data 없음, method 생략 가능
+urllib.request.Request(url, headers=...)
+```
+
+---
+
+## 3. REST API 외부 호출 패턴
 
 외부 API는 항상 같은 패턴:
 
@@ -54,6 +76,22 @@ with urllib.request.urlopen(req, timeout=60) as resp:
 
 Groq API는 Cloudflare CDN 뒤에 있다.
 기본 Python User-Agent (`Python-urllib/3.x`)를 Cloudflare가 봇으로 판단해 **HTTP 1010** 오류를 반환한다.
+
+* 추가 설명 : UA = User-Agent
+
+HTTP 요청 시 "나는 어떤 클라이언트다"라고 서버에 알려주는 헤더입니다.
+
+브라우저가 보내는 예시:
+
+
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+Python이 기본으로 보내는 예시:
+
+
+Python-urllib/3.11
+Cloudflare 입장에서 Python-urllib/3.11은 봇 시그니처이므로 차단하고, 브라우저 UA는 통과시킵니다. 그래서 _groq.py에서 브라우저 UA로 위장하는 겁니다.
+
+
 
 **해결:** 브라우저 User-Agent로 위장
 
@@ -132,7 +170,102 @@ time.sleep(wait)
 
 ---
 
-## 7. 프로젝트 내 연결
+## 7. resp와 exc 객체 구조
+
+`urlopen()`을 쓸 때 실제로 어떤 데이터가 오가는지 구체적으로 정리한다.
+
+### 성공 시 — `resp` (HTTPResponse)
+
+```python
+with urllib.request.urlopen(req, timeout=60) as resp:
+    ...
+```
+
+**`resp.headers`** — 응답 헤더. `dict`처럼 `.get(키, 기본값)`으로 접근.
+
+```
+x-ratelimit-remaining-requests: 28
+x-ratelimit-remaining-tokens: 5000
+x-ratelimit-reset-requests: 2s
+x-ratelimit-reset-tokens: 500ms
+content-type: application/json
+```
+
+**`resp.read()`** — 응답 body. bytes 타입.
+
+```python
+b'{"id":"chatcmpl-xxx","object":"chat.completion","choices":[{"message":{"role":"assistant","content":"안녕하세요!"}}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}'
+```
+
+`json.loads(resp.read().decode("utf-8"))` 후 dict가 되면:
+
+```python
+{
+    "choices": [
+        {"message": {"role": "assistant", "content": "안녕하세요!"}}
+    ],
+    "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 5,
+        "total_tokens": 15
+    }
+}
+```
+
+→ 답변 꺼내기: `body["choices"][0]["message"]["content"]`  
+→ 사용량 꺼내기: `body["usage"]`
+
+---
+
+### 실패 시 — `exc` (HTTPError)
+
+```python
+except urllib.error.HTTPError as exc:
+    ...
+```
+
+**`exc.code`** — HTTP 상태 코드 (숫자).
+
+```
+429   # rate limit 초과 → 대기 후 재시도
+401   # 인증 실패 → API 키 확인
+500   # 서버 오류 → raise
+```
+
+**`exc.read()`** — 오류 body. `resp.read()`와 똑같이 bytes 타입.
+
+```python
+b'{"error":{"message":"Rate limit exceeded: please try again in 12.5s","type":"rate_limit_exceeded"}}'
+```
+
+`json.loads(exc.read().decode("utf-8"))` 후:
+
+```python
+{
+    "error": {
+        "message": "Rate limit exceeded: please try again in 12.5s",
+        "type": "rate_limit_exceeded"
+    }
+}
+```
+
+→ 메시지 꺼내기: `body["error"]["message"]`
+
+---
+
+### 요약
+
+| | 헤더 | body |
+|---|---|---|
+| 성공 (`resp`) | `resp.headers.get("키", "")` | `resp.read()` |
+| 실패 (`exc`) | `exc.code` (숫자) | `exc.read()` |
+
+`resp`와 `exc` 모두 `.read()`로 body를 읽는 구조는 동일하다.
+API마다 달라지는 건 body 안의 JSON 구조뿐이다.
+
+---
+
+## 8. 프로젝트 내 연결
 
 ```
 _groq.py

@@ -1,4 +1,4 @@
-# Phase 3-2 개요 — AI 채팅 패널 (`chat.js`)
+# Phase 3 개요 — AI 채팅 패널 (`chat.js`)
 
 > JS 프론트엔드 영역. 노트북/실습 없음. 구조와 흐름만 파악한다.
 
@@ -11,7 +11,10 @@ chat.js
   ├── 상태 관리          aiState, _serverHasKey, _cachedChats
   ├── 초기화             initAIChat(sessionId), _initAIChatPanel()
   ├── 모델 관리          _fetchModels(), _buildModelDropdown()
-  ├── 메시지 전송        sendAIMessage()  →  POST /api/groq-proxy
+  ├── 메시지 전송        sendAIMessage()
+  │     ├── POST /api/index-session   (인덱스 없을 때)
+  │     ├── POST /api/query-semantic  (top-k 청크 검색)
+  │     └── POST /api/groq-proxy      (Groq 호출)
   ├── 채팅 기록 저장     _saveChat()      →  POST /api/chat-save
   ├── 채팅 기록 복원     _loadChatHistory()  →  GET /api/chat-list
   └── Rate Limit 배지    _updateRateLimitBadge()
@@ -32,7 +35,6 @@ let aiState = {
 ```
 
 `messages`가 Groq에 전달되는 실제 대화 이력이다.
-`chatId`는 서버에 저장된 기록을 식별하는 키.
 
 ---
 
@@ -75,22 +77,31 @@ const FALLBACK_MODELS = [
 
 ---
 
-## 메시지 전송 흐름
+## 메시지 전송 흐름 (Phase 3 RAG)
 
 ```
 사용자 입력
   → sendAIMessage()
       1. messages에 user 메시지 추가
       2. _renderAIMessages()  (로딩 스피너 표시)
-      3. POST /api/groq-proxy  { messages, model, api_key, session_context }
-      4. 응답에서 content, rate_limit 추출
-      5. messages에 assistant 메시지 추가
-      6. _updateRateLimitBadge(rate_limit)
-      7. _saveChat()  → POST /api/chat-save
+      3. POST /api/query-semantic  { session_id, query: 입력 텍스트, top_k: 3 }
+            ├── 인덱스 없으면 서버가 build_index() 먼저 실행
+            └── search() → top-k 청크 반환
+      4. top-k 청크로 system 프롬프트 구성
+            "아래는 대화 내용입니다. 이 내용을 근거로 답하세요.\n\n" + 청크들
+      5. POST /api/groq-proxy  { messages: [system, ...history, user], model, api_key }
+      6. 응답에서 content, rate_limit 추출
+      7. messages에 assistant 메시지 추가
+      8. _updateRateLimitBadge(rate_limit)
+      9. _saveChat()  → POST /api/chat-save
 ```
 
-`session_context`는 서버에서 session.json을 읽어 system 프롬프트에 포함한다.
-(`server.py _api_groq_proxy()` 내부에서 처리)
+**전체 대화 vs 검색 청크:**
+
+| | 방식 | 토큰 | 정확도 |
+|---|---|---|---|
+| 이전 방식 | 전체 대화 full text → system | 많음 | 노이즈 포함 |
+| Phase 3 RAG | top-k 청크만 → system | 적음 | 관련 내용만 |
 
 ---
 
@@ -104,8 +115,6 @@ function _updateRateLimitBadge(rl) {
   // 값이 낮으면 경고 색상으로 전환
 }
 ```
-
-배지는 입력 툴바 옆에 항상 노출. 한도가 낮아지면 전송 전 확인 유도.
 
 ---
 
@@ -129,30 +138,33 @@ function _updateRateLimitBadge(rl) {
   DELETE /api/chat-delete?id=...
 ```
 
-기록은 대화 뷰어 우측의 "이전 대화" 목록에서 확인·선택 가능.
-
 ---
 
-## server.py 연동 (`_api_groq_proxy`)
+## server.py 연동
 
-`/api/groq-proxy`는 단순 중계가 아니라 서버에서 컨텍스트를 **조립**한다.
+**`POST /api/query-semantic`** — 벡터 검색
+```python
+def _api_query_semantic(self, body):
+    session_id = body["session_id"]
+    query      = body["query"]
+    top_k      = body.get("top_k", 3)
 
+    session_dir = self._data_dir / session_id
+    session     = ...  # session.json 로드
+    index_path  = build_index(session, session_dir)   # 없으면 생성
+    results     = search(query, index_path, top_k)    # top-k 청크 반환
+    self._json(results)
+```
+
+**`POST /api/groq-proxy`** — 단순 프록시 (컨텍스트 조립은 chat.js에서)
 ```python
 def _api_groq_proxy(self, body):
-    session_id = body.get("session_id")
-    messages   = body.get("messages", [])   # chat.js의 multi-turn 이력
-    model      = body.get("model", "llama-3.1-8b-instant")
-    api_key    = body.get("api_key") or load_env_key()
-
-    # 세션 컨텍스트를 system 메시지로 앞에 삽입
-    if session_id:
-        session = ...  # session.json 로드
-        context, _ = extract_text_context(session, max_chars=8000)
-        system = {"role": "system", "content": "대화 기록:\n\n" + context}
-        messages = [system] + messages
+    messages = body["messages"]   # system + history + user (chat.js에서 조립)
+    model    = body.get("model", "llama-3.1-8b-instant")
+    api_key  = body.get("api_key") or load_env_key()
 
     content, usage, rate_limit = chat_completion(messages, model, api_key)
     self._json({"content": content, "usage": usage, "rate_limit": rate_limit})
 ```
 
-Phase 4+에서는 이 system 프롬프트 구성 부분이 벡터 검색 + KG 결과로 교체된다.
+Phase 4+에서는 `/api/query-semantic`이 토픽 기반 청크 + 인접 게이팅 + KG 검색으로 교체된다.
