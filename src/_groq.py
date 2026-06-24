@@ -13,7 +13,6 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 import os
-from pathlib import path
 
 _CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 _MODELS_URL = "https://api.groq.com/openai/v1/models"

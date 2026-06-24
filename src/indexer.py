@@ -86,6 +86,8 @@ def chunk_session(session: dict, chunk_size: int = CHUNK_SIZE) -> list[dict]:
 
     for i, turn in enumerate(session['turns']):
         text = format_turn(turn)
+        if text is None:
+            continue
         added_len = len(text) + (len(_SEP) if parts else 0)
         if parts and chunk_size!= 0 and current_len + added_len > chunk_size:
             chunks.append({
@@ -108,7 +110,13 @@ def chunk_session(session: dict, chunk_size: int = CHUNK_SIZE) -> list[dict]:
 
     return chunks
 
-
+def attach_embeddings(chunks: list[dict], embeddings: list[list[float]]) -> list[dict]:
+    """각 청크 딕셔너리에 embedding 필드를 추가해 반환한다.
+    
+    반환: [{"text": str, "embedding": list[float], "turn_start": int, "turn_end": int}, ...]
+    힌트: zip(chunks, embeddings) 로 순서 맞춰 결합
+    """
+    return [{**c, "embedding": emb} for c, emb in zip(chunks, embeddings)]
 
 def build_index(session: dict, session_dir: Path, chunk_size: int = CHUNK_SIZE) -> Path:
     """세션을 청크로 분할 후 임베딩해 session_index.json으로 저장한다. (노트북 03 섹션 1 참고)
@@ -124,8 +132,33 @@ def build_index(session: dict, session_dir: Path, chunk_size: int = CHUNK_SIZE) 
     # 4. chunk_session(session, chunk_size) → chunks
     # 5. embed_texts([c["text"] for c in chunks]) → embeddings
     # 6. 각 chunk에 embedding 추가 → json 저장
-    pass  # TODO
+    index_path = session_dir / "session_index.json"
+    if index_path.exists():
+        return index_path
+    
+    session_dir.mkdir(parents=True, exist_ok=True)
+    chunk = chunk_session(session, chunk_size=chunk_size)
+    embed = [e.tolist() for e in embed_texts([c['text'] for c in chunk])]
+    data = attach_embeddings(chunk, embed)
+    index_path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding='utf-8'
+    )
+    return index_path
 
+
+
+def rank_chunks(query_vec: list[float], index_data: list[dict]) -> list[dict]:
+    """각 청크에 score를 추가하고 코사인 유사도 내림차순으로 정렬해 반환한다.
+    
+    반환: [{"text": str, "score": float, "turn_start": int, "turn_end": int}, ...]
+    힌트:
+    - cosine_similarity(query_vec, c["embedding"]) for c in index_data
+    - {**c, "score": score} 로 기존 필드 유지하며 score 추가
+    - sorted(..., key=lambda x: x["score"], reverse=True)
+    """
+    score = [cosine_similarity(query_vec, c['embedding']) for c in index_data]
+    return sorted([{**c, "score": score} for score, c in zip(score, index_data)], key=lambda x: x['score'], reverse=True)
 
 def search(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
     """코사인 유사도로 상위 top_k 청크를 검색한다. (노트북 03 섹션 2 참고)
@@ -139,4 +172,8 @@ def search(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
     # 3. embed_texts([query])[0] → query_vec
     # 4. 각 청크와 cosine_similarity 계산 → score 추가
     # 5. score 내림차순 정렬 → [:top_k] 반환
-    pass  # TODO
+    if not index_path.exists():
+        return []
+    data = json.loads(index_path.read_text())
+    query_embed = embed_texts([query])[0]
+    return rank_chunks(query_embed, data)[:top_k]
