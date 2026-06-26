@@ -186,3 +186,47 @@ JavaScript 프론트엔드(Phase 2 app.js, Phase 7 UI) 등 AI 직군과 무관�
 - 면접관이 노트북만 봤을 때 개념 이해 여부가 보이는가?
 - 실습과 이론의 연결이 자연스러운가?
 - 너무 길어서 읽기 싫어지는 시점이 어디인가?
+
+
+
+## Phase 3
+
+### 평가 설계 결정
+
+**모델 분리**
+- 답변 생성: `llama-3.3-70b-versatile` (`_ANSWER_MODEL`)
+- 분류·judge 등 단순 작업: `llama-3.1-8b-instant` (`_FAST_MODEL`)
+
+**평가 지표**
+- `Hit Rate`: `source_turns ∩ included_turns` 비율, 결정론, LLM 없음
+- `key_facts`: 정답 핵심 값 포함 비율 (결정론)
+- `Answer Score`: LLM-as-judge (0~10점, temperature=0.0으로 일관성 확보)
+
+**Baseline 구현 방식**
+- solution과 달리 **벡터 검색 기반** baseline 채택 (CLAUDE.md 스펙 기준)
+- 고정 크기 청크(2000자) 분할 + fastembed 임베딩 + 코사인 유사도 top-k=3 검색
+- solution baseline(전체 텍스트 직접 전달)과 비교 기준점이 다름
+
+### Baseline 점수 (Phase 4 비교 기준)
+
+**짧은 대화 (8개, 벡터 검색)**
+
+| 지표 | 점수 |
+|------|------|
+| Hit Rate | 1.00 |
+| key_facts | 0.94 |
+| Answer Score | 7.1 / 10 |
+
+**긴 대화 (15개, 벡터 검색)**
+
+| 지표 | 점수 |
+|------|------|
+| Hit Rate | 0.91 |
+| key_facts | 0.77 |
+| Answer Score | 5.1 / 10 |
+
+→ 긴 대화에서 Hit Rate는 높지만 key_facts·Answer Score가 낮음 → 고정 청크 경계가 주제를 무시해 답변 품질 저하
+→ Phase 4 토픽 기반 청크로 개선 후 위 수치와 비교
+
+### 아쉬운 점
+- notebook.md에 인풋이 뭐고 아웃풋이 뭔지 자세한 설명이 없어서 힘들었음.
