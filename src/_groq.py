@@ -27,11 +27,11 @@ def load_env_key() -> str:
     파일 없으면 os.environ["GROQ_API_KEY"] 시도.
     둘 다 없으면 빈 문자열 반환.
     """
-    env = Path("../.env")
-    if env.exists():
-        for line in env.read_text(encoding='utf-8').splitlines():
-            if line.startswith("GROQ_API_KEY=") and not line.startswith("#"):
-                return line[len("GROQ_API_KEY="):].strip().strip('"').strip("'")
+    for candidate in [Path(".env"), Path("../.env"), Path(__file__).parent.parent / ".env"]:
+        if candidate.exists():
+            for line in candidate.read_text(encoding='utf-8').splitlines():
+                if line.startswith("GROQ_API_KEY=") and not line.startswith("#"):
+                    return line[len("GROQ_API_KEY="):].strip().strip('"').strip("'")
     return os.environ.get("GROQ_API_KEY", "")
 
 
