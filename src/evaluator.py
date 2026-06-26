@@ -254,35 +254,82 @@ def print_results(mode: str, judged: list[dict], no_judge: bool, truncated: bool
     # 출력 항목:
     # - 모드, QA 수, truncated 여부
     # - 평균 토큰, 평균 Hit Rate
-    # - 평균 key_facts 점수 (있을 때)
+    # - 평균 key_facts 점수 (있을 때) + hit=0 / hit>0 분리 (정답 누출 탐지)
     # - 평균 Answer Score (no_judge=False 일 때)
     # - 타입별 상세 (single/paraphrase/multihop 혼재 시)
-    # - 개별 QA 결과
-    print(f"\n=== {mode} | QA {len(judged)}개 {'[truncated]' if truncated else ''} ===")
-    
-    hits = [r["hit"] for r in judged]
-    print(f"평균 Hit Rate: {sum(hits)/len(hits):.2f}")
-    
-    kf = [r["keyfact_score"] for r in judged if r["keyfact_score"] is not None]
-    if kf:
-        print(f"평균 key_facts: {sum(kf)/len(kf):.2f}")
-    
+    # - 개별 QA 결과 (질문 45자, 답변 80자, score/keyfact/hit/tokens)
+    print()
+    print("=" * 60)
+    print(f"  모드: {mode}" + (" (truncated)" if truncated else ""))
+    print(f"  QA 수: {len(judged)}")
+
+    total_tokens = sum(r.get("usage", {}).get("total_tokens", 0) for r in judged)
+    avg_tokens = total_tokens / len(judged) if judged else 0
+    print(f"  평균 토큰: {avg_tokens:.0f}")
+
+    hits = [r.get("hit", 1.0) for r in judged]
+    avg_hit = sum(hits) / len(hits) if hits else 0.0
+    print(f"  평균 Hit Rate: {avg_hit:.2f}")
+
+    kf_all = [r["keyfact_score"] for r in judged if r.get("keyfact_score") is not None]
+    if kf_all:
+        print(f"  평균 key_facts 점수: {sum(kf_all) / len(kf_all) * 10:.1f} / 10  ({len(kf_all)}개 항목)")
+        kf_zero = [r["keyfact_score"] for r in judged
+                   if r.get("keyfact_score") is not None and r.get("hit", 0) == 0]
+        kf_nonzero = [r["keyfact_score"] for r in judged
+                      if r.get("keyfact_score") is not None and r.get("hit", 0) > 0]
+        if kf_zero:
+            print(f"    └ hit=0 항목 평균: {sum(kf_zero) / len(kf_zero) * 10:.1f}"
+                  f"  (낮아야 정상 · 높으면 정답 누출 의심)")
+        if kf_nonzero:
+            print(f"    └ hit>0 항목 평균: {sum(kf_nonzero) / len(kf_nonzero) * 10:.1f}")
+
     if not no_judge:
-        scores = [r["score"] for r in judged]
-        print(f"평균 Answer Score: {sum(scores)/len(scores):.1f}/10")
-    
+        avg_score = sum(r.get("score", 0) for r in judged) / len(judged) if judged else 0
+        print(f"  평균 Answer Score(LLM): {avg_score:.2f} / 10")
+
+    by_type: dict[str, list] = defaultdict(list)
     for r in judged:
-        print(f"\nQ: {r['question']}")
-        print(f"A: {r['answer']}")
-        print(f"hit={r['hit']:.1f} keyfact={r['keyfact_score']}")
+        by_type[r.get("type", "single")].append(r)
+
+    if any(k != "single" for k in by_type):
+        print("\n  타입별:")
+        for qtype in ["single", "paraphrase", "multihop"]:
+            items = by_type.get(qtype)
+            if not items:
+                continue
+            avg_hit_t = sum(r.get("hit", 1.0) for r in items) / len(items)
+            line = f"    {qtype:12s} ({len(items)}개)  hit {avg_hit_t:.2f}"
+            kf_t = [r["keyfact_score"] for r in items if r.get("keyfact_score") is not None]
+            if kf_t:
+                line += f"  keyfact {sum(kf_t) / len(kf_t) * 10:.1f}"
+            if not no_judge:
+                avg_score_t = sum(r.get("score", 0) for r in items) / len(items)
+                line += f"  score {avg_score_t:.1f}"
+            print(line)
+
+    print("-" * 60)
+    for r in judged:
+        tokens = r.get("usage", {}).get("total_tokens", "?")
+        print(f"[{r.get('type', '?'):10s}] Q: {r['question'][:45]}")
+        print(f"  A: {r['answer'][:80].replace(chr(10), ' ')}")
+        kf = r.get("keyfact_score")
+        kf_str = f"keyfact {kf * 10:.0f}" if kf is not None else "keyfact -"
+        hit_str = f"hit {r.get('hit', 0.0):.1f}"
+        if not no_judge:
+            print(f"  score {r.get('score', '?'):.1f}  {kf_str}  {hit_str}  tokens {tokens}")
+        else:
+            print(f"  {kf_str}  {hit_str}  tokens {tokens}")
+        print()
+    print("=" * 60)
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="RAG 평가 파이프라인")
-    ap.add_argument("--session", required=True, type=Path, metavar="PATH",
-                    help="session.json 파일 경로")
+    ap.add_argument("--session", required=False, default=None, type=Path, metavar="PATH",
+                    help="session.json 파일 경로 (--load-judgments 단독 사용 시 생략 가능)")
     ap.add_argument("--modes", default="baseline", metavar="MODES",
                     help="평가 모드 (쉼표 구분, 현재: baseline)")
     ap.add_argument("--qa-pairs", type=Path, default=None, metavar="PATH",
@@ -311,8 +358,28 @@ def main() -> None:
     # 5. no_judge=False 이면 judge_answers()
     # 6. print_results()
     # 7. output 지정 시 JSON 저장
-    
+
+    modes = args.modes.split(",")
+    all_results = {}
+
+    # --load-judgments 단독: 기존 결과 파일을 바로 출력
+    if args.load_judgments:
+        saved = json.loads(args.load_judgments.read_text(encoding="utf-8"))
+        for mode in modes:
+            judged = saved.get(mode, [])
+            if not judged:
+                print(f"  [{mode}] 결과 없음", file=sys.stderr)
+                continue
+            print_results(mode, judged, args.no_judge)
+            all_results[mode] = judged
+        if args.output:
+            args.output.write_text(json.dumps(all_results, ensure_ascii=False, indent=2), encoding="utf-8")
+        return
+
     # 1. session.json 로드 + api_key 확인
+    if not args.session:
+        print("오류: --session 또는 --load-judgments 중 하나가 필요합니다.", file=sys.stderr)
+        raise SystemExit(1)
     session = json.loads(args.session.read_text(encoding="utf-8"))
     api_key = load_env_key()
 
@@ -330,8 +397,6 @@ def main() -> None:
     session_dir = args.session.parent / session_id
 
     # 4. modes 루프
-    modes = args.modes.split(",")
-    all_results = {}
     for mode in modes:
         if mode == "baseline":
             results = run_baseline(qa_pairs, session, session_dir, api_key)
@@ -340,9 +405,7 @@ def main() -> None:
             continue
 
         # 5. judge
-        if args.load_judgments:
-            judged = json.loads(args.load_judgments.read_text(encoding="utf-8"))
-        elif not args.no_judge:
+        if not args.no_judge:
             judged = judge_answers(results, api_key)
         else:
             judged = results
