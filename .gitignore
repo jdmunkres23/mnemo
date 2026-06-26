@@ -3,10 +3,13 @@ PAPERS.md
 PROMPT_GUIDE.md
 
 output/
+conversations/
 conversations_learning/
 conversations_solution/
 .env
 data/
+raw_data/*
+!raw_data/.gitkeep
 
 .venv/
 __pycache__/
