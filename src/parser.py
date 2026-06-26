@@ -211,7 +211,7 @@ def main() -> None:
 
     ap = argparse.ArgumentParser(description="Claude.ai 내보내기 JSON → session.json 변환")
     ap.add_argument("--input", required=True, help="conversations.json 경로")
-    ap.add_argument("--output-dir", default="conversations_learning", help="출력 디렉토리 (기본: conversations_learning)")
+    ap.add_argument("--output-dir", default="conversations", help="출력 디렉토리 (기본: conversations)")
     args = ap.parse_args()
 
     saved = parse_export(args.input, args.output_dir)

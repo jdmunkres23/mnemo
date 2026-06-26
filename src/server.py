@@ -156,6 +156,7 @@ def _make_handler(data_dir: Path):
             mime, _ = mimetypes.guess_type(str(file_path))
             mime = mime or "application/octet-stream"
             self.send_response(200)
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
             self.send_header("Content-Type", mime)
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
@@ -434,8 +435,8 @@ def main() -> None:
                     help="서버 포트 (기본값: 8080)")
     ap.add_argument("--no-browser", action="store_true",
                     help="브라우저 자동 열기 비활성화")
-    ap.add_argument("--data-dir", type=Path, default=Path("conversations_learning"),
-                    metavar="PATH", help="세션 데이터 디렉토리 (기본값: ./conversations_solution)")
+    ap.add_argument("--data-dir", type=Path, default=Path("conversations"),
+                    metavar="PATH", help="세션 데이터 디렉토리 (기본값: ./conversations)")
     args = ap.parse_args()
 
     if not args.data_dir.exists():
