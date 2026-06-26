@@ -1,0 +1,372 @@
+{
+  "baseline": [
+    {
+      "question": "LoRA 어댑터의 rank와 alpha를 각각 얼마로 잡았나요?",
+      "expected": "rank 16, alpha 32로 잡았습니다.",
+      "answer": "LoRA 어댑터의 rank는 16, alpha는 32로 잡았습니다.",
+      "usage": {
+        "queue_time": 0.324580682,
+        "prompt_tokens": 4018,
+        "prompt_time": 0.369230784,
+        "completion_tokens": 22,
+        "completion_time": 0.029361361,
+        "total_tokens": 4040,
+        "total_time": 0.398592145
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        1
+      ],
+      "key_facts": [
+        "16",
+        "32"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "학습 시 최대 시퀀스 길이를 얼마로 설정했나요?",
+      "expected": "max_seq_len 2048로 설정했습니다.",
+      "answer": "2048로 설정했습니다.",
+      "usage": {
+        "queue_time": 0.181107995,
+        "prompt_tokens": 4016,
+        "prompt_time": 0.215284651,
+        "completion_tokens": 7,
+        "completion_time": 0.026388191,
+        "total_tokens": 4023,
+        "total_time": 0.241672842
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        3
+      ],
+      "key_facts": [
+        "2048"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "per-device 배치와 그래디언트 누적을 곱한 유효 배치 크기는 얼마였나요?",
+      "expected": "32입니다 (per_device 4 × grad_accum 8).",
+      "answer": "per-device 배치 크기는 4, 그래디언트 누적은 8이었으니, 유효 배치 크기는 4 × 8 = 32가 됩니다.",
+      "usage": {
+        "queue_time": 0.047028264,
+        "prompt_tokens": 4027,
+        "prompt_time": 0.399701806,
+        "completion_tokens": 41,
+        "completion_time": 0.129709857,
+        "total_tokens": 4068,
+        "total_time": 0.529411663
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        5
+      ],
+      "key_facts": [
+        "32"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "처음에 설정한 학습률과 스케줄러 종류는 무엇이었나요?",
+      "expected": "학습률 2e-4, cosine 스케줄러로 시작했습니다.",
+      "answer": "초기 학습률은 2e-4, 스케줄러는 cosine 스케줄러였습니다.",
+      "usage": {
+        "queue_time": 0.010396709,
+        "prompt_tokens": 4020,
+        "prompt_time": 0.22727685,
+        "completion_tokens": 26,
+        "completion_time": 0.056265612,
+        "total_tokens": 4046,
+        "total_time": 0.283542462
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        7
+      ],
+      "key_facts": [
+        "2e-4",
+        "cosine"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "학습 손실이 초반에 튀어(spike) NaN이 난 원인과, 그걸 잡으려고 조정한 설정들은 무엇이었나요?",
+      "expected": "초기 학습률이 높고 warmup이 없던 게 원인이며, warmup_ratio 0.03 + 학습률 1e-4 하향 + bf16 전환 + max_grad_norm 1.0 클리핑으로 잡았습니다.",
+      "answer": "초반 학습 손실이 튀면서 NaN이 나던 문제는, **초기 학습률이 높고 warmup이 없어 그래디언트가 폭발적으로 커지면서** 발생했습니다. 이 문제를 해결하기 위해 세 가지 설정을 조정했습니다.\n\n1.  **warmup 추가**: 전체 스텝의 3%를 warmup으로 사용하여, 학습 초반에 학습률을 0부터 천천히 올리게 했습니다.\n2.  **학습률 하향**: 초기 학습률을 2e-4에서 1e-4로 낮추어, 그래디언트가 너무 크게 증가하지 않도록 했습니다.\n3.  **fp16에서 bf16으로 전환**: fp16은 표현 범위가 좁아, 큰 그래디언트 값에서 NaN이 쉽게 발생합니다. bf16은 fp16과 비슷한 메모리 사용량을 유지하면서, 더 넓은 표현 범위를 제공하여, 큰 그래디언트 값에서 NaN이 발생할 가능성이 줄어듭니다.",
+      "usage": {
+        "queue_time": 0.298130252,
+        "prompt_tokens": 4035,
+        "prompt_time": 0.412553449,
+        "completion_tokens": 237,
+        "completion_time": 0.827626657,
+        "total_tokens": 4272,
+        "total_time": 1.240180106
+      },
+      "hit": 0.6666666666666666,
+      "type": "multihop",
+      "source_turns": [
+        9,
+        11,
+        13
+      ],
+      "key_facts": [
+        "0.03",
+        "1e-4",
+        "bf16",
+        "1.0"
+      ],
+      "keyfact_score": 0.5
+    },
+    {
+      "question": "학습 중 OOM을 해결하려고 켠 설정은 무엇이었나요?",
+      "expected": "gradient_checkpointing을 켰습니다(bf16과 함께).",
+      "answer": "per_device_train_batch_size를 줄이고 gradient_accumulation_steps를 늘렸습니다. 예를 들어, per_device_train_batch_size = 2, gradient_accumulation_steps = 16로 설정하여 유효 배치를 32로 유지하면서 메모리 사용을 줄였습니다.",
+      "usage": {
+        "queue_time": 0.085616733,
+        "prompt_tokens": 4017,
+        "prompt_time": 0.217656456,
+        "completion_tokens": 61,
+        "completion_time": 0.253203344,
+        "total_tokens": 4078,
+        "total_time": 0.4708598
+      },
+      "hit": 0.0,
+      "type": "single",
+      "source_turns": [
+        15
+      ],
+      "key_facts": [
+        "gradient_checkpointing"
+      ],
+      "keyfact_score": 0.0
+    },
+    {
+      "question": "평가 정확도가 0.99로 비정상적으로 높았던 원인과 그 처리 방법은 무엇이었나요?",
+      "expected": "train/test 데이터 누수(중복 샘플)가 원인이며, 정규화 후 sha1로 중복 제거한 다음 분할하도록 순서를 바꿔 해결했습니다.",
+      "answer": "평가 정확도가 0.99로 비정상적으로 높았던 원인은 **데이터 누수**였습니다. 즉, 학습에 사용된 데이터와 평가에 사용된 데이터가 일부 중복되어 있었기 때문에, 모델이 평가 데이터를 거의 모두 맞출 수 있었던 것입니다.\n\n이 문제를 해결하기 위해, 데이터를 다시 분할하여 학습 데이터와 평가 데이터가 완전히 분리되도록 했습니다. 구체적으로는, 데이터를 랜덤하게 섞은 후에 다시 분할하여, 평가 데이터에 학습 데이터가 포함되지 않도록 했습니다. 이를 통해 모델의 실제 성능을 평가할 수 있게 되었습니다.",
+      "usage": {
+        "queue_time": 0.010449413,
+        "prompt_tokens": 4027,
+        "prompt_time": 0.426666662,
+        "completion_tokens": 147,
+        "completion_time": 0.759132545,
+        "total_tokens": 4174,
+        "total_time": 1.185799207
+      },
+      "hit": 0.0,
+      "type": "multihop",
+      "source_turns": [
+        21,
+        23,
+        25
+      ],
+      "key_facts": [
+        "누수",
+        "sha1"
+      ],
+      "keyfact_score": 0.5
+    },
+    {
+      "question": "중복 제거는 무엇을 기준으로 했고, 데이터 누수로 몇 건 정도가 새어 있었나요?",
+      "expected": "정규화한 텍스트의 sha1 해시를 기준으로 했고, 약 1,800건이 train/test에 겹쳐 있었습니다.",
+      "answer": "중복 제거는 **문자열 해시**를 기준으로 했고, 데이터 누수는 **총 17건**이 새어 있었음이 확인되었습니다.",
+      "usage": {
+        "queue_time": 0.403156413,
+        "prompt_tokens": 4024,
+        "prompt_time": 0.251556577,
+        "completion_tokens": 40,
+        "completion_time": 0.15328344,
+        "total_tokens": 4064,
+        "total_time": 0.404840017
+      },
+      "hit": 0.0,
+      "type": "single",
+      "source_turns": [
+        23,
+        25
+      ],
+      "key_facts": [
+        "sha1",
+        "1800"
+      ],
+      "keyfact_score": 0.0
+    },
+    {
+      "question": "전체 데이터셋 규모는 몇 건이었나요?",
+      "expected": "42,000건이었습니다.",
+      "answer": "대화 기록을 살펴보면, 전체 데이터셋 규모에 대한 정보는 제공되지 않았습니다. 사용자는 데이터의 길이 분포와 샘플의 95~99 퍼센타일 토큰 길이가 1500쯤임을 언급했지만, 전체 데이터셋의 건 수에 대한 정보는 없습니다.",
+      "usage": {
+        "queue_time": 0.207702983,
+        "prompt_tokens": 4013,
+        "prompt_time": 0.305820616,
+        "completion_tokens": 79,
+        "completion_time": 0.328796799,
+        "total_tokens": 4092,
+        "total_time": 0.634617415
+      },
+      "hit": 0.0,
+      "type": "single",
+      "source_turns": [
+        24,
+        25
+      ],
+      "key_facts": [
+        "42000"
+      ],
+      "keyfact_score": 0.0
+    },
+    {
+      "question": "데이터 누수를 제거한 뒤 평가 정확도는 얼마로 바뀌었나요?",
+      "expected": "0.99에서 0.86으로 떨어졌습니다(이게 실제 성능).",
+      "answer": "데이터 누수를 제거한 뒤 정확도는 0.85에서 0.83으로 약간 떨어졌습니다.",
+      "usage": {
+        "queue_time": 0.010394883,
+        "prompt_tokens": 4021,
+        "prompt_time": 0.272787938,
+        "completion_tokens": 28,
+        "completion_time": 0.0928169,
+        "total_tokens": 4049,
+        "total_time": 0.365604838
+      },
+      "hit": 0.0,
+      "type": "multihop",
+      "source_turns": [
+        25,
+        27
+      ],
+      "key_facts": [
+        "0.86"
+      ],
+      "keyfact_score": 0.0
+    },
+    {
+      "question": "모델이 답을 너무 일찍 끝내던 토크나이저 문제의 원인과 해결책은 무엇이었나요?",
+      "expected": "pad_token이 eos_token과 같은데 라벨 마스킹을 안 해 패딩(=eos)에까지 loss가 걸린 게 원인이며, pad 토큰을 분리하고 라벨을 -100으로 마스킹(padding_side right)해 해결했습니다.",
+      "answer": "토크나이저 문제의 원인은 **토크나이저 설정**이었습니다. 구체적으로는 **max_new_tokens** 값을 너무 낮게 설정해서, 모델이 제대로 된 문장을 완성하지 못하고 너무 일찍 끝내던 것이었습니다.\n\n해결책은 **max_new_tokens** 값을 높이는 것이었습니다. 구체적으로는 128에서 512로 높여서, 모델이 더 긴 문장을 생성할 수 있도록 했습니다. 또한, **min_length** 값을 설정해서, 모델이 최소한으로 생성해야 하는 토큰 수를 지정했습니다.",
+      "usage": {
+        "queue_time": 0.06116789,
+        "prompt_tokens": 4031,
+        "prompt_time": 0.268493942,
+        "completion_tokens": 136,
+        "completion_time": 0.66176198,
+        "total_tokens": 4167,
+        "total_time": 0.930255922
+      },
+      "hit": 0.0,
+      "type": "multihop",
+      "source_turns": [
+        29,
+        31
+      ],
+      "key_facts": [
+        "eos",
+        "-100"
+      ],
+      "keyfact_score": 0.0
+    },
+    {
+      "question": "LoRA를 병합한 뒤 4-bit(nf4)로 양자화했을 때 정확도는 얼마였나요?",
+      "expected": "0.83이었습니다 (bf16은 0.86).",
+      "answer": "LoRA를 병합한 뒤 4-bit(nf4)로 양자화했을 때 정확도는 0.75였습니다.",
+      "usage": {
+        "queue_time": 0.162245548,
+        "prompt_tokens": 4028,
+        "prompt_time": 0.316477231,
+        "completion_tokens": 32,
+        "completion_time": 0.079569236,
+        "total_tokens": 4060,
+        "total_time": 0.396046467
+      },
+      "hit": 0.0,
+      "type": "single",
+      "source_turns": [
+        37,
+        38
+      ],
+      "key_facts": [
+        "0.83"
+      ],
+      "keyfact_score": 0.0
+    },
+    {
+      "question": "추론 서빙은 무엇으로, 몇 번 포트에 띄웠나요?",
+      "expected": "vLLM으로 8001 포트에 띄웠습니다.",
+      "answer": "추론 서빙은 vllm을 사용하여 8000 포트에 띄웠습니다.",
+      "usage": {
+        "queue_time": 0.1622997,
+        "prompt_tokens": 4019,
+        "prompt_time": 0.247539919,
+        "completion_tokens": 24,
+        "completion_time": 0.084705125,
+        "total_tokens": 4043,
+        "total_time": 0.332245044
+      },
+      "hit": 0.0,
+      "type": "single",
+      "source_turns": [
+        39,
+        40
+      ],
+      "key_facts": [
+        "vllm",
+        "8001"
+      ],
+      "keyfact_score": 0.5
+    },
+    {
+      "question": "생성이 멈추지 않고 같은 말을 반복하던 문제의 원인과 해결책은 무엇이었나요?",
+      "expected": "서빙 chat template이 학습 포맷과 달라 eos가 빠진 게 원인이며, 템플릿을 학습과 통일(eos 포함)하고 stop 토큰 지정 + repetition_penalty 1.1을 더해 해결했습니다.",
+      "answer": "생성이 멈추지 않고 같은 말을 반복하던 문제의 원인은 토크나이저 설정이 잘못되어 있었기 때문입니다. 구체적으로는 `max_new_tokens` 설정이 너무 작아, 생성된 텍스트가 계속 반복되는 문제였습니다.\n\n해결책은 `max_new_tokens` 값을 늘리고, `no_repeat_ngram_size` 설정을 추가하여 반복되는 단어 또는 구를 제거하는 것이었습니다. 또한, `early_stopping` 설정을 True로 설정하여 생성이 중복되는 경우에 생성을 중단하도록 했습니다.",
+      "usage": {
+        "queue_time": 0.010243822,
+        "prompt_tokens": 4025,
+        "prompt_time": 1.034713113,
+        "completion_tokens": 132,
+        "completion_time": 0.648602606,
+        "total_tokens": 4157,
+        "total_time": 1.6833157189999999
+      },
+      "hit": 0.0,
+      "type": "multihop",
+      "source_turns": [
+        41,
+        43
+      ],
+      "key_facts": [
+        "eos",
+        "repetition_penalty"
+      ],
+      "keyfact_score": 0.0
+    },
+    {
+      "question": "서빙 지연을 줄이려고 최대 컨텍스트 길이(max_model_len)를 얼마로 낮췄나요?",
+      "expected": "4096에서 2048로 낮췄습니다.",
+      "answer": "서빙 지연을 줄이려고 최대 컨텍스트 길이(max_model_len)를 2048로 낮췄습니다.",
+      "usage": {
+        "queue_time": 0.29888981,
+        "prompt_tokens": 4027,
+        "prompt_time": 0.34183419,
+        "completion_tokens": 30,
+        "completion_time": 0.072117824,
+        "total_tokens": 4057,
+        "total_time": 0.413952014
+      },
+      "hit": 0.0,
+      "type": "paraphrase",
+      "source_turns": [
+        47,
+        49
+      ],
+      "key_facts": [
+        "4096",
+        "2048"
+      ],
+      "keyfact_score": 0.5
+    }
+  ]
+}

@@ -16,3 +16,5 @@ __pycache__/
 docs/phases/
 docs/progress.md
 docs/different.md
+
+/eval_data/test/**

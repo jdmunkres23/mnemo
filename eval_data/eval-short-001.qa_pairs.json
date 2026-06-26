@@ -1,0 +1,98 @@
+[
+  {
+    "question": "매출 성장률을 예측 구간별로 각각 몇 %로 가정했나요?",
+    "expected": "1~3년차 35%, 4~5년차 20%로 가정했습니다.",
+    "source_turns": [
+      1,
+      2
+    ],
+    "type": "single",
+    "key_facts": [
+      "35",
+      "20"
+    ]
+  },
+  {
+    "question": "EBIT(영업이익) 마진을 어떻게 변화시키기로 했나요?",
+    "expected": "현재 18%에서 5년차 25%로 점진 개선하는 것으로 잡았습니다.",
+    "source_turns": [
+      3
+    ],
+    "type": "single",
+    "key_facts": [
+      "18",
+      "25"
+    ]
+  },
+  {
+    "question": "할인율(WACC)을 몇 %로 적용했나요?",
+    "expected": "11.5%로 적용했습니다.",
+    "source_turns": [
+      7
+    ],
+    "type": "single",
+    "key_facts": [
+      "11.5"
+    ]
+  },
+  {
+    "question": "1년차 현금흐름 현재가치가 과대평가된 원인은 무엇이었고 어떻게 고쳤나요?",
+    "expected": "첫 예측연도를 t=0으로 할인해 사실상 할인을 안 한 off-by-one 실수였고, 할인 지수 t를 1부터(1~5)로 고쳐 해결했습니다.",
+    "source_turns": [
+      8,
+      9
+    ],
+    "type": "single",
+    "key_facts": [
+      "t=1",
+      "1부터"
+    ]
+  },
+  {
+    "question": "터미널 밸류는 어떤 방법으로, 영구성장률은 몇 %로 구했나요?",
+    "expected": "고든 성장 모형으로 구했고, 영구성장률 g는 2.5%를 적용했습니다.",
+    "source_turns": [
+      13
+    ],
+    "type": "single",
+    "key_facts": [
+      "고든",
+      "2.5"
+    ]
+  },
+  {
+    "question": "기업가치(EV)에서 주주가치로 갈 때, 보유 순현금 얼마를 어떻게 반영했나요?",
+    "expected": "순현금 30억을 더했습니다 (순부채가 −30억이라 EV에 가산).",
+    "source_turns": [
+      16,
+      17
+    ],
+    "type": "single",
+    "key_facts": [
+      "30억"
+    ]
+  },
+  {
+    "question": "주당가치를 계산할 때 총 주식수를 몇 주로 두었나요?",
+    "expected": "1,000만 주를 기준으로 했습니다.",
+    "source_turns": [
+      18,
+      19
+    ],
+    "type": "single",
+    "key_facts": [
+      "1000만"
+    ]
+  },
+  {
+    "question": "할인율이 1%p 어긋나면 기업가치가 대략 얼마나 변한다고 봤나요?",
+    "expected": "약 9~10% 변한다고 봤습니다 (WACC +1%p에 약 9% 하락).",
+    "source_turns": [
+      21
+    ],
+    "type": "paraphrase",
+    "key_facts": [
+      "9~10"
+    ]
+  }
+]
