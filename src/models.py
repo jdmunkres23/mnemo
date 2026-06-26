@@ -95,5 +95,5 @@ class Session(BaseModel):
     created_at: str   # ISO8601
     updated_at: str   # ISO8601
     turns: list[Turn]
-
-    # TODO (노트북 실습 3): 노트북에서 구현 후 여기에 옮기세요.
+    # trunk 이후 분기된 경로들. 브랜치 없으면 None.
+    branches: list[list[Turn]] | None = None

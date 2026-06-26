@@ -84,20 +84,97 @@ def parse_message(msg: dict) -> Turn:
     return Turn(role=role, blocks=blocks)
 
 
+_ROOT_SENTINEL = "00000000-0000-4000-8000-000000000000"
+
+
+def _build_branch_paths(msgs: list[dict]) -> list[list[dict]]:
+    """parent_message_uuid 트리를 순회해 루트→리프 경로를 모두 반환한다.
+    (phase3_branch_eda.md 참고)
+
+    구현 순서:
+    1. {uuid: msg} 역방향 맵 구성
+    2. parent가 _ROOT_SENTINEL이거나 맵에 없으면 roots에 추가
+       그 외: children[parent].append(uuid)
+    3. collect(uid, path) 재귀: 자식 없으면 [path+[uid]], 있으면 자식마다 재귀
+    4. 각 root에서 collect 호출 → uuid 경로를 실제 msg 객체 경로로 변환
+    """
+    uuid_map = {m["uuid"]: m for m in msgs}
+    children: dict[str, list[str]] = {}
+    roots: list[str] = []
+
+    for m in msgs:
+        parent = m.get("parent_message_uuid")
+        if parent is None or parent == _ROOT_SENTINEL or parent not in uuid_map:
+            roots.append(m["uuid"])
+        else:
+            children.setdefault(parent, []).append(m["uuid"])
+
+    def collect(uid: str, path: list[str]) -> list[list[str]]:
+        path = path + [uid]
+        if uid not in children:
+            return [path]
+        result = []
+        for child in children[uid]:
+            result.extend(collect(child, path))
+        return result
+
+    all_paths = []
+    for root in roots:
+        all_paths.extend(collect(root, []))
+
+    return [[uuid_map[uid] for uid in path] for path in all_paths]
+
+
+def _common_prefix_len(paths: list[list[dict]]) -> int:
+    """모든 경로의 공통 앞부분(trunk) 길이를 반환한다.
+    (phase3_branch_eda.md 참고)
+
+    힌트: paths[0][i]["uuid"] 가 모든 경로의 i번째 uuid와 같으면 공통.
+    """
+    if not paths:
+        return 0
+    min_len = min(len(p) for p in paths)
+    for i in range(min_len):
+        uid = paths[0][i]["uuid"]
+        if not all(p[i]["uuid"] == uid for p in paths):
+            return i
+    return min_len
+
+
 def parse_conversation(conv: dict) -> Session:
     """
     단일 conversation 딕셔너리를 Session 모델로 변환한다.
 
-    반환 형식: Session(session_id, title, created_at, updated_at, turns=[...])
+    반환 형식: Session(session_id, title, created_at, updated_at, turns=[...], branches=...)
+    - 브랜치 없음: branches=None, turns=전체 메시지
+    - 브랜치 있음: turns=trunk(공통 앞부분), branches=분기 이후 각 경로
 
-    노트북 실습 5 참고.
+    힌트:
+    - _build_branch_paths(msgs) 로 모든 경로 구하기
+    - 경로 1개 → 브랜치 없음, branches=None
+    - 경로 2개+ → _common_prefix_len() 으로 trunk 길이 계산
+      trunk_turns = paths[0][:trunk_len] → parse_message() 적용
+      branches = [path[trunk_len:] → parse_message() 적용] for each path
     """
-    # TODO: uuid → session_id, name → title
-    #        chat_messages 목록을 parse_message()로 변환해 turns 생성
     session_id = conv['uuid']
     title = conv['name']
-    turns = [parse_message(t) for t in conv['chat_messages']]
-    return Session(session_id=session_id, title=title, turns = turns, created_at=conv['created_at'], updated_at=conv['updated_at'])
+    msgs = conv.get('chat_messages', [])
+
+    paths = _build_branch_paths(msgs) if msgs else []  # TODO: 위 두 함수 구현 후 동작
+
+    if not paths or len(paths) == 1:
+        # 브랜치 없음: 기존 방식 유지
+        turns = [parse_message(t) for t in (paths[0] if paths else msgs)]
+        return Session(session_id=session_id, title=title,
+                       created_at=conv['created_at'], updated_at=conv['updated_at'],
+                       turns=turns, branches=None)
+
+    trunk_len = _common_prefix_len(paths)
+    trunk_turns = [parse_message(m) for m in paths[0][:trunk_len]]
+    branches = [[parse_message(m) for m in path[trunk_len:]] for path in paths]
+    return Session(session_id=session_id, title=title,
+                   created_at=conv['created_at'], updated_at=conv['updated_at'],
+                   turns=trunk_turns, branches=branches)
 
 
 
@@ -127,3 +204,15 @@ def parse_export(export_path: str | Path, output_dir: str | Path) -> list[Path]:
         saved.append(out_path)
 
     return saved
+
+
+def main() -> None:
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Claude.ai 내보내기 JSON → session.json 변환")
+    ap.add_argument("--input", required=True, help="conversations.json 경로")
+    ap.add_argument("--output-dir", default="conversations_learning", help="출력 디렉토리 (기본: conversations_learning)")
+    args = ap.parse_args()
+
+    saved = parse_export(args.input, args.output_dir)
+    print(f"{len(saved)}개 세션 저장 완료 → {args.output_dir}")
