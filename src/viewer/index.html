@@ -157,15 +157,77 @@
   </div>
 </main>
 
-<!-- AI 채팅 패널 (껍데기) -->
+<!-- AI 채팅 패널 -->
 <aside class="ai-chat-panel hidden" id="aiChatPanel">
+  <!-- 상단 헤더 -->
   <div class="ai-panel-top">
-    <span class="ai-panel-title">AI 채팅</span>
-    <button class="hico" onclick="toggleChatPanel()"><i class="ti ti-x"></i></button>
+    <div class="ai-panel-top-left">
+      <span class="ai-panel-title" id="aiPanelTitle">AI 채팅</span>
+      <span class="ai-session-label" id="aiSessionLabel"></span>
+    </div>
+    <div class="ai-panel-top-right">
+      <button class="hico" onclick="newAIChat()" title="새 채팅"><i class="ti ti-edit"></i></button>
+      <button class="hico" id="aiHistoryBtn" onclick="toggleAIHistory()" title="대화 기록"><i class="ti ti-clock"></i></button>
+      <button class="hico" id="aiSettingsBtn" title="설정"><i class="ti ti-settings"></i></button>
+      <button class="hico" onclick="toggleChatPanel()" title="닫기"><i class="ti ti-x"></i></button>
+    </div>
   </div>
-  <div class="ai-panel-body">
-    <i class="ti ti-message-bolt"></i>
-    <p>AI 채팅 기능은<br>Phase 4에서 구현 예정입니다.</p>
+
+  <!-- 설정 패널 (토글) -->
+  <div class="ai-settings" id="aiSettings" style="display:none">
+    <div class="settings-field">
+      <label class="settings-label">Groq API 키</label>
+      <input type="password" id="groqApiKeyInput" class="settings-input" placeholder="gsk_...">
+      <span class="settings-hint" id="aiKeyHint"></span>
+    </div>
+    <div class="settings-field">
+      <label class="settings-label">기본 모델</label>
+      <select id="aiModelSelSettings" class="settings-input">
+        <option value="llama-3.1-8b-instant">Llama 3.1 8B (빠름)</option>
+        <option value="llama-3.3-70b-versatile">Llama 3.3 70B (정확)</option>
+        <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+      </select>
+    </div>
+    <button class="settings-save-btn" id="aiSaveKeyBtn">저장</button>
+  </div>
+
+  <!-- 채팅 뷰 (기본) -->
+  <div class="ai-chat-view" id="aiChatView">
+    <div class="ai-msg-list" id="aiMsgList">
+      <div class="ai-empty-msg" id="aiEmptyMsg">
+        <i class="ti ti-message-bolt"></i>
+        <p>현재 대화에 대해<br>자유롭게 질문하세요</p>
+      </div>
+      <div class="ai-thinking" id="aiThinking" style="display:none">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+    <div class="ai-input-wrap">
+      <div class="ai-toolbar">
+        <div class="ai-model-dropdown" id="aiModelDropdown">
+          <button class="ai-model-btn" id="aiModelBtn" type="button">
+            <span class="ai-model-btn-label">모델 선택</span>
+            <i class="ti ti-chevron-up" style="font-size:10px;opacity:.5;flex-shrink:0"></i>
+          </button>
+          <div class="ai-model-popover" id="aiModelPopover"></div>
+        </div>
+        <span class="rate-badge" id="rateBadge" style="display:none"></span>
+      </div>
+      <div class="ai-input-row">
+        <textarea class="ai-ta" id="aiTa" placeholder="질문 입력... (Enter로 전송)" rows="1"></textarea>
+        <button class="send-btn" id="aiSendBtn" disabled><i class="ti ti-arrow-up"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 히스토리 뷰 -->
+  <div class="ai-history-view" id="aiHistoryView" style="display:none">
+    <div class="ai-hist-section-label">이 대화의 AI 채팅 기록</div>
+    <div id="aiHistItems"></div>
+    <div class="ai-hist-full-empty" id="aiHistEmpty" style="display:none">
+      <i class="ti ti-messages-off"></i>
+      <p>저장된 채팅이 없습니다</p>
+    </div>
   </div>
 </aside>
 
@@ -174,6 +236,7 @@
 <script src="/viewer/renderers/text.js"></script>
 <script src="/viewer/renderers/thinking.js"></script>
 <script src="/viewer/renderers/tool.js"></script>
+<script src="/viewer/chat.js"></script>
 <script src="/viewer/app.js"></script>
 </body>
 </html>
