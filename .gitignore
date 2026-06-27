@@ -3,10 +3,13 @@ PAPERS.md
 PROMPT_GUIDE.md
 
 output/
+conversations/
 conversations_learning/
 conversations_solution/
 .env
 data/
+
+_preview_collapsed.png
 
 .venv/
 __pycache__/
