@@ -447,6 +447,7 @@ def search_vector(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
 
 # ── Phase 4: 쿼리 분류 ────────────────────────────────────────────────────────
 
+import re
 _RETRIEVAL_PATTERN = re.compile(r'\d|\.\w{2,4}\b|[/\\]')
 
 def should_be_retrieval(question: str) -> bool:
