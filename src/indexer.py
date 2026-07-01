@@ -447,6 +447,24 @@ def search_vector(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
 
 # ── Phase 4: 쿼리 분류 ────────────────────────────────────────────────────────
 
+_RETRIEVAL_PATTERN = re.compile(r'\d|\.\w{2,4}\b|[/\\]')
+
+def should_be_retrieval(question: str) -> bool:
+    """구체적 수치/파일명/경로 포함 여부로 retrieval 강제 여부를 반환한다.
+
+    입력:
+      question: 분류할 질문 문자열
+    출력:
+      True  → retrieval 강제 (LLM 분류 생략)
+      False → LLM 분류 진행
+
+    True 조건 (하나라도 해당 시):
+    - 숫자 포함:      re.search(r'\\d', question)
+    - 파일 확장자:    re.search(r'\\.\\w{2,4}\\b', question)  (.py .json .js .md 등)
+    - 경로 포함:      '/' in question or '\\\\' in question
+    """
+    return bool(_RETRIEVAL_PATTERN.search(question))
+
 def classify_query(question: str, api_key: str) -> str:
     """질문을 simple / analytical / retrieval 로 분류한다. (노트북 04-2 섹션 1 참고)
 
@@ -467,4 +485,118 @@ def classify_query(question: str, api_key: str) -> str:
     # 3. llama-3.1-8b-instant 호출 (max_tokens=20, temperature=0.0)
     # 4. 응답 파싱: {"simple","analytical","retrieval"} 검증
     # 5. 예외 → "retrieval"
-    pass  # TODO
+    if should_be_retrieval(question):
+        return "retrieval"
+    
+    prompt = f"""다음 질문을 아래 세 가지 중 하나로 분류하세요.
+    
+    - simple: 이 대화 세션 없이도 LLM이 알고 있는 일반 지식
+    - analytical: 대화 전체 흐름 파악 필요, 구체적 수치/파일명 불필요
+    - retrieval: 특정 수치, 파일명, 에러명, 결정 사항 등 구체적 사실 필요
+
+    중요: 모호하면 retrieval로 답하세요.
+    단어 하나만 출력하세요: simple 또는 analytical 또는 retrieval
+
+    질문: {question}
+    분류:"""
+
+    try:
+        content, usage, _ = chat_completion(
+            [{'role': 'user', 'content': prompt}],
+            'llama-3.1-8b-instant', api_key, max_tokens=20, temperature=0.0
+        )
+        answer = content.strip().lower().split()[0]
+
+    except Exception:
+        return 'retrieval'
+    return answer if answer in {'simple', 'analytical', 'retrieval'} else 'retrieval'
+
+
+def build_analytical_context(topics: list[dict]) -> str:
+    """토픽 요약 목록으로 analytical 경로의 system 프롬프트를 만든다.
+
+    입력:
+      topics: [{"position": int, "summary": str, ...}, ...]
+    출력:
+      "아래는 이 대화 세션의 주요 주제 요약입니다.\n1. ...\n2. ...\n이 요약을 바탕으로 답변하세요."
+
+    힌트:
+    - lines = ["아래는 이 대화 세션의 주요 주제 요약입니다.\n"]
+    - 각 topic의 position+1 번호와 summary 추가
+    - lines.append("\n이 요약을 바탕으로 답변하세요.")
+    - "\n".join(lines)
+    """
+    lines = ['아래는 이 대화 세션의 주요 주제 요약입니다.\n']
+    for t in topics:
+        lines.append(f"{t['position'] + 1}. {t['summary']}")
+    lines.append('\n이 요약을 바탕으로 답변하세요.')
+    return '\n'.join(lines)
+
+
+def build_retrieval_context(search_results: list[dict]) -> str:
+    """검색된 토픽 원문으로 retrieval 경로의 system 프롬프트를 만든다.
+
+    입력:
+      search_results: [{"text": str, "summary": str, "score": float, ...}, ...]
+    출력:
+      "아래는 관련 대화 내용입니다. 이 내용을 근거로 답변하세요.\n\n---\n\n[사용자]\n..."
+
+    힌트:
+    - parts = ["아래는 관련 대화 내용입니다. 이 내용을 근거로 답변하세요.\n"]
+    - 각 result의 "text" 추가
+    - "\n\n---\n\n".join(parts)
+    """
+    parts = ['아래는 관련 대화 내용입니다. 이 내용을 근거로 답변하세요. \n']
+    for r in search_results:
+        parts.append(r['text'])
+    return '\n\n---\n\n'.join(parts)
+
+
+def route_query(
+    question: str,
+    topics: list[dict],
+    index_path: Path,
+    api_key: str,
+    top_k: int = 3,
+) -> dict:
+    """질문을 분류하고 유형별 컨텍스트를 구성한다.
+
+    입력:
+      question:   분류할 질문
+      topics:     [{"position": int, "summary": str, ...}, ...]
+      index_path: vector_index.json 경로
+      api_key:    Groq API 키
+      top_k:      retrieval 경로에서 가져올 토픽 수
+    출력:
+      {
+        "query_type":     "simple" | "analytical" | "retrieval",
+        "system":         str,
+        "search_results": list[dict]   ← retrieval일 때만 채워짐, 나머지 []
+      }
+
+    구현 순서:
+    1. classify_query(question, api_key) → query_type
+    2. "simple"     → system = "당신은 도움이 되는 AI 어시스턴트입니다.", search_results = []
+    3. "analytical" → system = build_analytical_context(topics),       search_results = []
+    4. "retrieval"  → search_results = search_vector(question, index_path, top_k)
+                       system = build_retrieval_context(search_results)
+    5. return {"query_type": query_type, "system": system, "search_results": search_results}
+    """
+    query_type = classify_query(question, api_key)
+    
+    if query_type == 'simple':
+        system = '당신은 도움이 되는 AI 어시스턴트입니다.'
+        search_results = []
+
+    elif query_type == 'analytical':
+        system = build_analytical_context(topics)
+        search_results = []
+    else:
+        search_results = search_vector(question, index_path, top_k)
+        system = build_retrieval_context(search_results)
+    
+    return {
+        'query_type' : query_type,
+        'system' : system,
+        'search_results': search_results,
+    }
