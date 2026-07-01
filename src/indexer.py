@@ -15,12 +15,14 @@ CHUNK_SIZE = 2000  # 기본 청크 크기 (글자 수)
 _model = None  # 지연 초기화 (첫 embed 호출 시)
 
 
+_CACHE_DIR = Path.home() / ".cache" / "fastembed"
+
 def _get_model():
     """fastembed TextEmbedding 인스턴스 반환 (싱글턴)."""
     global _model
     if _model is None:
         from fastembed import TextEmbedding
-        _model = TextEmbedding(EMBEDDING_MODEL)
+        _model = TextEmbedding(EMBEDDING_MODEL, cache_dir=str(_CACHE_DIR))
     return _model
 
 
@@ -312,7 +314,7 @@ def build_topics(session: dict, boundaries: list[int]) -> list[dict]:
 
     topics = []
     position = 0
-    for s, e in enumerate(starts, ends):
+    for s, e in zip(starts, ends):
         group = turns[s:e]
         text = format_turns_as_text(group)
         if text is None:
@@ -323,9 +325,9 @@ def build_topics(session: dict, boundaries: list[int]) -> list[dict]:
             "turn_end": e-1,
             "position": position
         })
-        posiion += 1
+        position += 1
 
-        return topics
+    return topics
 
 
 def summarize_topic(topic_text: str, api_key: str) -> str:
