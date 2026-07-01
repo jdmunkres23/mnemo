@@ -16,7 +16,7 @@ from pathlib import Path
 from src._groq import chat_completion, load_env_key
 
 _FAST_MODEL = "llama-3.1-8b-instant"       # 분류, QA 생성, judge 등 단순 작업
-_ANSWER_MODEL = "llama-3.3-70b-versatile"  # RAG 답변 생성
+_ANSWER_MODEL = "qwen/qwen3-32b"  # RAG 답변 생성 (테스트용, 실제 평가 시 llama-3.3-70b-versatile로 교체)
 
 
 # ── Hit Rate 계산 ─────────────────────────────────────────────────────────────

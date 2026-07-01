@@ -175,7 +175,7 @@ def search(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
     # 5. score 내림차순 정렬 → [:top_k] 반환
     if not index_path.exists():
         return []
-    data = json.loads(index_path.read_text())
+    data = json.loads(index_path.read_text(encoding='utf-8'))
     query_embed = embed_texts([query])[0]
     return rank_chunks(query_embed, data)[:top_k]
 
@@ -357,7 +357,7 @@ def summarize_topic(topic_text: str, api_key: str) -> str:
     try:
 
       content, usage, _ = chat_completion(
-        [{'role': 'uesr', 'content': summary_prompt}],
+        [{'role': 'user', 'content': summary_prompt}],
         'llama-3.1-8b-instant', api_key, max_tokens=150, temperature=0.0
       )
       return content
@@ -408,7 +408,7 @@ def build_vector_index(session: dict, session_dir: Path, api_key: str) -> Path:
     topics = build_topics(session, boundaries)
     summaries = [summarize_topic(t['text'], api_key) for t in topics]
     embeddings = embed_texts(summaries)
-    for i, topic in enumerate(summaries):
+    for i, topic in enumerate(topics):
         topic['summary'] = summaries[i]
         topic['embedding'] = list(embeddings[i])
     index_path.write_text(json.dumps(topics, ensure_ascii=False), encoding='utf-8')
