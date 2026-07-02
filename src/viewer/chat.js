@@ -310,8 +310,7 @@ async function sendAIMessage() {
   _setThinking(true);
 
   try {
-    const context = await _getRagContext(aiState.sessionId, text);
-    const systemPrompt = `아래는 관련 대화 내용입니다. 이 내용을 근거로 질문에 답하세요.\n\n${context}`;
+    const systemPrompt = await _getRagContext(aiState.sessionId, text);
 
     const groqMessages = [
       { role: 'system', content: systemPrompt },
@@ -349,7 +348,7 @@ async function sendAIMessage() {
   }
 }
 
-// ── RAG: 인덱싱 후 벡터 검색으로 관련 청크 반환 ──
+// ── RAG: 인덱싱 후 쿼리 라우팅 결과(system 프롬프트) 반환 ──
 async function _getRagContext(sessionId, query) {
   // 1. 인덱싱 (이미 돼 있으면 서버에서 재사용)
   await fetch('/api/index-session', {
@@ -358,18 +357,15 @@ async function _getRagContext(sessionId, query) {
     body: JSON.stringify({ session_id: sessionId }),
   });
 
-  // 2. 벡터 검색
+  // 2. 쿼리 라우팅 + 벡터 검색 (simple/analytical/retrieval에 따라 system이 서버에서 조립됨)
   const res = await fetch('/api/query-semantic', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, query, top_k: 3 }),
   });
-  if (!res.ok) throw new Error('벡터 검색 실패');
+  if (!res.ok) throw new Error('검색 실패');
   const data = await res.json();
-
-  const chunks = Array.isArray(data) ? data : (data.results || []);
-  if (chunks.length === 0) return '관련 내용을 찾지 못했습니다.';
-  return chunks.map(c => c.text).join('\n\n---\n\n');
+  return data.system || '당신은 도움이 되는 AI 어시스턴트입니다.';
 }
 
 // ── 채팅 기록 ──
