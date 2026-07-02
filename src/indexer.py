@@ -223,7 +223,7 @@ def detect_topic_boundaries(session: dict, api_key: str) -> list[int]:
     # 1. [(i, text)] 형태로 사용자 turn 추출
     # 2. 사용자 turn 1개 이하 → [] 반환
     # 3. "i: 메시지\n..." 프롬프트 구성
-    # 4. llama-3.1-8b-instant 호출 (max_tokens=50, temperature=0.0)
+    # 4. llama-3.1-8b-instant 호출 (max_tokens=300, temperature=0.0)
     # 5. re.findall(r'\d+', content) → 정수 변환
     # 6. 유효 범위 필터: 1 이상 len(turns)-1 이하
     # 7. 예외 → _uniform_boundaries(session)
@@ -250,7 +250,7 @@ def detect_topic_boundaries(session: dict, api_key: str) -> list[int]:
 
         content, usage, _ = chat_completion(
             [{'role': 'user', 'content': prompt}],
-            'llama-3.1-8b-instant', api_key, max_tokens=50, temperature=0.0
+            'llama-3.1-8b-instant', api_key, max_tokens=300, temperature=0.0
         )
         nums = re.findall(f'\d+', content)
         boundaries = [int(n) for n in nums]
@@ -341,27 +341,27 @@ def summarize_topic(topic_text: str, api_key: str) -> str:
       "fastembed는 pip install fastembed로 설치하며 ONNX 런타임이 내장되어 있다."
       Groq 호출 실패 시 topic_text[:200] fallback.
 
-    모델: llama-3.1-8b-instant, max_tokens=150, temperature=0.0
+    모델: llama-3.1-8b-instant, max_tokens=250, temperature=0.0
     원칙: 고유명사, 경로, 설정값은 원문 그대로 포함.
     """
-    # 1. 요약 프롬프트 구성 (topic_text[:1500] 사용)
+    # 1. 요약 프롬프트 구성 (topic_text[:4000] 사용)
     # 2. chat_completion 호출
     # 3. 응답 content 반환
     # 4. 예외 → topic_text[:200]
     summary_prompt = f"""다음 대화를 핵심 정보만 포함해 2~3문장으로 요약하세요.
     고유명사, 경로, 설정값, 에러명은 원문 그대로 포함하세요.
-    
-    {topic_text}
-    
+
+    {topic_text[:4000]}
+
     요약:"""
     try:
 
       content, usage, _ = chat_completion(
         [{'role': 'user', 'content': summary_prompt}],
-        'llama-3.1-8b-instant', api_key, max_tokens=150, temperature=0.0
+        'llama-3.1-8b-instant', api_key, max_tokens=250, temperature=0.0
       )
       return content
-    
+
     except Exception:
         return topic_text[:200]
 
