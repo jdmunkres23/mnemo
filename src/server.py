@@ -383,6 +383,7 @@ def _make_handler(data_dir: Path):
             session_id = body.get("session_id", "")
             query = body.get("query", "")
             top_k = int(body.get("top_k", 3))
+            api_key = body.get('api_key', '')
 
             if not session_id or not query:
                 self._json({"error": "session_id and query are required"}, 400)
@@ -397,12 +398,13 @@ def _make_handler(data_dir: Path):
                 return
 
             try:
-                from src.indexer import build_index, search
+                from src.indexer import build_vector_index, route_query
                 session = json.loads(session_path.read_text(encoding="utf-8"))
                 session_dir = self._data_dir / session_id
-                index_path = build_index(session, session_dir)
-                results = search(query, index_path, top_k)
-                self._json(results)
+                index_path = build_vector_index(session, session_dir, api_key)
+                topics = json.loads(index_path.read_text(encoding='utf-8'))
+                result = route_query(question=query, topics=topics, index_path=index_path, api_key=api_key, top_k=top_k)
+                self._json(result)
             except Exception as exc:
                 logger.warning("query-semantic error: %s", exc)
                 self._json({"error": "검색 실패"}, 500)

@@ -1,0 +1,390 @@
+{
+  "baseline": [
+    {
+      "question": "매출 성장률을 예측 구간별로 각각 몇 %로 가정했나요?",
+      "expected": "1~3년차 35%, 4~5년차 20%로 가정했습니다.",
+      "answer": "1~3년차에는 35%, 4~5년차에는 20%의 매출 성장률을 가정했습니다.",
+      "usage": {
+        "queue_time": 0.052250497,
+        "prompt_tokens": 3376,
+        "prompt_time": 0.300319651,
+        "completion_tokens": 30,
+        "completion_time": 0.094039005,
+        "total_tokens": 3406,
+        "total_time": 0.394358656
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        1,
+        2
+      ],
+      "key_facts": [
+        "35",
+        "20"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "EBIT(영업이익) 마진을 어떻게 변화시키기로 했나요?",
+      "expected": "현재 18%에서 5년차 25%로 점진 개선하는 것으로 잡았습니다.",
+      "answer": "현재(Year 0) 18%에서 5년차까지 25%로 점진적으로 증가시켜, 중간 연도는 선형으로 보간합니다. 그대로 계산하면:\n\n- Year 1: 19.0%\n- Year 2: 20.0%\n- Year 3: 21.0%\n- Year 4: 22.5%\n- Year 5: 25.0% \n\n이런 식으로 마진이 개선됩니다.",
+      "usage": {
+        "queue_time": 0.060138124,
+        "prompt_tokens": 2999,
+        "prompt_time": 0.225030409,
+        "completion_tokens": 108,
+        "completion_time": 0.434472143,
+        "total_tokens": 3107,
+        "total_time": 0.659502552
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        3
+      ],
+      "key_facts": [
+        "18",
+        "25"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "할인율(WACC)을 몇 %로 적용했나요?",
+      "expected": "11.5%로 적용했습니다.",
+      "answer": "WACC(가중평균자본비용)는 11.5%로 정했습니다. 이 값은 DCF 모델링에서 매우 중요한데, 이로 인해 기업가치가 달라질 수 있습니다. 예를 들어 WACC가 12%로 tăng하면 기업가치가 약 9% 하락하고, WACC가 10.5%로 감소하면 기업가치가 약 10% 상승할 수 있습니다.",
+      "usage": {
+        "queue_time": 0.161889897,
+        "prompt_tokens": 3001,
+        "prompt_time": 0.155138111,
+        "completion_tokens": 98,
+        "completion_time": 0.323052914,
+        "total_tokens": 3099,
+        "total_time": 0.478191025
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        7
+      ],
+      "key_facts": [
+        "11.5"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "1년차 현금흐름 현재가치가 과대평가된 원인은 무엇이었고 어떻게 고쳤나요?",
+      "expected": "첫 예측연도를 t=0으로 할인해 사실상 할인을 안 한 off-by-one 실수였고, 할인 지수 t를 1부터(1~5)로 고쳐 해결했습니다.",
+      "answer": "1년차 현금흐름 현재가치가 과대평가된 원인은 **할인 시점 off-by-one 실수**였습니다.\n\n원인은 첫 예측연도(Year 1)의 현금흐름을 `(1+WACC)^0`으로 나누어서 할인했기 때문입니다. 이를 고친 코드는 `(1+WACC)^1`로 나누는 것입니다.\n\n즉, 첫 해를 `t=0`으로 두어 분모가 1이되어 사실상 할인을 안한 것이 과대평가의 원인이었는데, 이를 `t=1`로 수정하여 `(1.115)^1`로 나눔으로써 hiện금흐름의 현재가치가 정상으로 낮아졌습니다.",
+      "usage": {
+        "queue_time": 0.115475407,
+        "prompt_tokens": 3016,
+        "prompt_time": 0.254374921,
+        "completion_tokens": 165,
+        "completion_time": 0.675721765,
+        "total_tokens": 3181,
+        "total_time": 0.930096686
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        8,
+        9
+      ],
+      "key_facts": [
+        "t=1",
+        "1부터"
+      ],
+      "keyfact_score": 0.5
+    },
+    {
+      "question": "터미널 밸류는 어떤 방법으로, 영구성장률은 몇 %로 구했나요?",
+      "expected": "고든 성장 모형으로 구했고, 영구성장률 g는 2.5%를 적용했습니다.",
+      "answer": "터미널 밸류는 5년 명시적 예측 이후의 가치를 나타내며, 고든 성장 모형(Gordon Growth Model)을 사용하여 구합니다. 고든 성장 모형에서는 터미널 밸류를 다음과 같이 계산합니다.\n\nTV(Year 5 시점) = FCF(Year 6) / (WACC − g)\n\n여기서 FCF(Year 6)는 6년차의 자유자산흐름, WACC는 가중평균자본비용, g는 영구성장률입니다.\n\n영구성장률(g)은 장기 경제성장률을 넘지 않는 수준으로 정의하며, 일반적으로 1.5%에서 3% 사이의 값을 사용합니다. 이 경우에는 2.5%를 사용하여 계산합니다.\n\nFCF(Year 6) = FCF(Year 5) × (1 + g)\ng = 영구성장률 = 2.5%\nWACC = 11.5%\n\n터미널 밸류는 5년차 시점의 값을 나타내므로, 이를 현재 시점으로 할인하여 현재 가치를 구해야 합니다.",
+      "usage": {
+        "queue_time": 0.162084662,
+        "prompt_tokens": 3012,
+        "prompt_time": 0.155461448,
+        "completion_tokens": 257,
+        "completion_time": 0.81005139,
+        "total_tokens": 3269,
+        "total_time": 0.965512838
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        13
+      ],
+      "key_facts": [
+        "고든",
+        "2.5"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "기업가치(EV)에서 주주가치로 갈 때, 보유 순현금 얼마를 어떻게 반영했나요?",
+      "expected": "순현금 30억을 더했습니다 (순부채가 −30억이라 EV에 가산).",
+      "answer": "EV에서 주주가치로 갈 때, 순현금을 반영하는 방식은 **순현금을 더하는 것**입니다. 즉, 기업가치(EV)에서 순부채(Net Debt)를 빼는 건데, 이 회사에는 순현금이 30억ある 상태로, **순부채는 마이너스(-30억)** 이므로 최종적으로는 **EV에 30억을 더**하는 효과가 됩니다.\n\n```\n주주가치 = EV + 30억\n```",
+      "usage": {
+        "queue_time": 0.052936876,
+        "prompt_tokens": 3016,
+        "prompt_time": 0.155455763,
+        "completion_tokens": 115,
+        "completion_time": 0.470393059,
+        "total_tokens": 3131,
+        "total_time": 0.625848822
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        16,
+        17
+      ],
+      "key_facts": [
+        "30억"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "주당가치를 계산할 때 총 주식수를 몇 주로 두었나요?",
+      "expected": "1,000만 주를 기준으로 했습니다.",
+      "answer": "1,000만 주를 단순 기준으로 두고 계산했으며, 옵션이 있으면 희석 주식수로 다시 한 번 확인하는 것을 권고하였습니다.",
+      "usage": {
+        "queue_time": 0.052375953,
+        "prompt_tokens": 3007,
+        "prompt_time": 0.222893735,
+        "completion_tokens": 40,
+        "completion_time": 0.155021437,
+        "total_tokens": 3047,
+        "total_time": 0.377915172
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        18,
+        19
+      ],
+      "key_facts": [
+        "1000만"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "할인율이 1%p 어긋나면 기업가치가 대략 얼마나 변한다고 봤나요?",
+      "expected": "약 9~10% 변한다고 봤습니다 (WACC +1%p에 약 9% 하락).",
+      "answer": "할인율이 1%p 어긋나면 기업가치는 대략 9~10% 변한다고 보았습니다.",
+      "usage": {
+        "queue_time": 0.050549751,
+        "prompt_tokens": 3015,
+        "prompt_time": 0.171480758,
+        "completion_tokens": 30,
+        "completion_time": 0.086236215,
+        "total_tokens": 3045,
+        "total_time": 0.257716973
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        21
+      ],
+      "key_facts": [
+        "9~10"
+      ],
+      "keyfact_score": 1.0
+    }
+  ],
+  "vector": [
+    {
+      "question": "매출 성장률을 예측 구간별로 각각 몇 %로 가정했나요?",
+      "expected": "1~3년차 35%, 4~5년차 20%로 가정했습니다.",
+      "answer": "5년 예측 기간 동안 매출 성장률을 1~3년간은 35%, 4~5년차는 20%로 가정했습니다.",
+      "usage": {
+        "queue_time": 0.361617734,
+        "prompt_tokens": 2231,
+        "prompt_time": 0.138043673,
+        "completion_tokens": 37,
+        "completion_time": 0.117957032,
+        "total_tokens": 2268,
+        "total_time": 0.256000705
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        1,
+        2
+      ],
+      "key_facts": [
+        "35",
+        "20"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "EBIT(영업이익) 마진을 어떻게 변화시키기로 했나요?",
+      "expected": "현재 18%에서 5년차 25%로 점진 개선하는 것으로 잡았습니다.",
+      "answer": "현재 18%에서 5년차까지 25%로 점진적으로 개선시킵니다. 중간의 2년차와 4년차는 선형으로 보간해서 구하면 됩니다.",
+      "usage": {
+        "queue_time": 0.171836257,
+        "prompt_tokens": 2594,
+        "prompt_time": 0.300314789,
+        "completion_tokens": 49,
+        "completion_time": 0.217918593,
+        "total_tokens": 2643,
+        "total_time": 0.518233382
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        3
+      ],
+      "key_facts": [
+        "18",
+        "25"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "할인율(WACC)을 몇 %로 적용했나요?",
+      "expected": "11.5%로 적용했습니다.",
+      "answer": "11.5%로 했습니다.",
+      "usage": {
+        "queue_time": 0.161706893,
+        "prompt_tokens": 2290,
+        "prompt_time": 0.247930202,
+        "completion_tokens": 9,
+        "completion_time": 0.03793109,
+        "total_tokens": 2299,
+        "total_time": 0.285861292
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        7
+      ],
+      "key_facts": [
+        "11.5"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "1년차 현금흐름 현재가치가 과대평가된 원인은 무엇이었고 어떻게 고쳤나요?",
+      "expected": "첫 예측연도를 t=0으로 할인해 사실상 할인을 안 한 off-by-one 실수였고, 할인 지수 t를 1부터(1~5)로 고쳐 해결했습니다.",
+      "answer": "1년차 현금흐름 현재가치가 과대평가된 원인은 **할인 시점 off-by-one 실수**였습니다. 값이 과대평가되는 전형적 원인이에요. 첫 예측연도(Year 1)의 현금흐름은 1년 뒤에 들어오니까 **t=1로 할인**해야 합니다. `(1+WACC)^0`으로 나누면 분모가 1이라 사실상 할인을 안 한 거예요. 한 해치 할인이 통째로 빠지면서 현재가치가 부풀려집니다. 이를 고친 방법은 `t`를 `1부터`로 고치는 것이며,こう하면 전체 기업가치가 정상으로 내려오게 됩니다.",
+      "usage": {
+        "queue_time": 0.161867825,
+        "prompt_tokens": 2670,
+        "prompt_time": 0.52463957,
+        "completion_tokens": 166,
+        "completion_time": 0.41549767,
+        "total_tokens": 2836,
+        "total_time": 0.94013724
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        8,
+        9
+      ],
+      "key_facts": [
+        "t=1",
+        "1부터"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "터미널 밸류는 어떤 방법으로, 영구성장률은 몇 %로 구했나요?",
+      "expected": "고든 성장 모형으로 구했고, 영구성장률 g는 2.5%를 적용했습니다.",
+      "answer": "고든 성장 모형(Gordon Growth Model)을 사용하여 터미널 밸류를 구했으며, 영구성장률(g)은 2.5%로 정했습니다.",
+      "usage": {
+        "queue_time": 0.161459173,
+        "prompt_tokens": 2235,
+        "prompt_time": 0.125399459,
+        "completion_tokens": 41,
+        "completion_time": 0.14021654,
+        "total_tokens": 2276,
+        "total_time": 0.265615999
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        13
+      ],
+      "key_facts": [
+        "고든",
+        "2.5"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "기업가치(EV)에서 주주가치로 갈 때, 보유 순현금 얼마를 어떻게 반영했나요?",
+      "expected": "순현금 30억을 더했습니다 (순부채가 −30억이라 EV에 가산).",
+      "answer": "順現금 30억을 전액으로 보아 기업가치에서 순부채를 빼는 데 사용했습니다. 순부채에서 현금을 빼면 순부채는 -30억의 순현금이 되어, 빼는 대신 플러스로 처리하여企業 가치에 30억을 더해 주주 가치로 계산했습니다.",
+      "usage": {
+        "queue_time": 0.161868704,
+        "prompt_tokens": 2660,
+        "prompt_time": 0.132820994,
+        "completion_tokens": 81,
+        "completion_time": 0.406223915,
+        "total_tokens": 2741,
+        "total_time": 0.539044909
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        16,
+        17
+      ],
+      "key_facts": [
+        "30억"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "주당가치를 계산할 때 총 주식수를 몇 주로 두었나요?",
+      "expected": "1,000만 주를 기준으로 했습니다.",
+      "answer": "1,000만 주로 계산하였습니다.",
+      "usage": {
+        "queue_time": 0.050785303,
+        "prompt_tokens": 2651,
+        "prompt_time": 0.332439285,
+        "completion_tokens": 12,
+        "completion_time": 0.053481942,
+        "total_tokens": 2663,
+        "total_time": 0.385921227
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        18,
+        19
+      ],
+      "key_facts": [
+        "1000만"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "할인율이 1%p 어긋나면 기업가치가 대략 얼마나 변한다고 봤나요?",
+      "expected": "약 9~10% 변한다고 봤습니다 (WACC +1%p에 약 9% 하락).",
+      "answer": "할인율(WACC)이 1%p 어긋나면 기업가치가 대략 9~10% 변동한다고 했어요. WACC가 11.5% 기준으로 10.5%나 12.5%로 바뀌어도 각각 10% 내외로 영향을 미친다고 하더라고요.",
+      "usage": {
+        "queue_time": 0.16075143,
+        "prompt_tokens": 2648,
+        "prompt_time": 0.150736268,
+        "completion_tokens": 77,
+        "completion_time": 0.327037024,
+        "total_tokens": 2725,
+        "total_time": 0.477773292
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        21
+      ],
+      "key_facts": [
+        "9~10"
+      ],
+      "keyfact_score": 1.0
+    }
+  ]
+}

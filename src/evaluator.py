@@ -16,7 +16,7 @@ from pathlib import Path
 from src._groq import chat_completion, load_env_key
 
 _FAST_MODEL = "llama-3.1-8b-instant"       # 분류, QA 생성, judge 등 단순 작업
-_ANSWER_MODEL = "llama-3.3-70b-versatile"  # RAG 답변 생성
+_ANSWER_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"  # RAG 답변 생성
 
 
 # ── Hit Rate 계산 ─────────────────────────────────────────────────────────────
@@ -181,6 +181,97 @@ def run_baseline(
 
 
 
+# ── 평가 모드: vector ────────────────────────────────────────────────────────
+
+def run_vector(
+    qa_pairs: list[dict],
+    session: dict,
+    session_dir: Path,
+    api_key: str,
+    top_k: int = 3,
+) -> list[dict]:
+    """vector: 토픽 기반 청크 + 요약 임베딩 벡터 검색 → top-k 원문 → Groq. (노트북 04-1 참고)
+
+    입력:
+      qa_pairs: [{"question": str, "expected": str, "source_turns": [int], "key_facts": [...], "type": str}, ...]
+      session: session.json dict
+      session_dir: vector_index.json이 저장될 디렉토리
+      api_key: Groq API 키
+
+    반환: run_baseline()과 동일 구조
+      [{"question", "expected", "answer", "usage", "hit", "type", "source_turns",
+        "key_facts", "keyfact_score"}, ...]
+
+    run_baseline()과의 차이:
+    - build_index() → build_vector_index() (토픽 기반 인덱스)
+    - search()      → search_vector()     (요약 임베딩 검색, 원문 전달)
+
+    구현 순서:
+    1. build_vector_index(session, session_dir, api_key) → index_path
+    2. 각 QA 쌍에 대해:
+       a. search_vector(qa["question"], index_path, top_k) → top-k 토픽
+       b. included_turns: 검색된 토픽의 turn_start~turn_end 범위 합집합
+       c. compute_hit(qa["source_turns"], included_turns) 로 hit 계산
+       d. 토픽 원문(result["text"])을 system 프롬프트로 조립
+       e. chat_completion([system, user_question], _ANSWER_MODEL, api_key, max_tokens=512, temperature=0.0)
+       f. keyfact_score(answer, qa["key_facts"])
+       g. 결과 dict 구성
+    3. 예외 발생 시 run_baseline()과 동일한 오류 처리
+    """
+    from src.indexer import build_vector_index, search_vector
+    index_path = build_vector_index(session, session_dir, api_key)
+    
+    results = []
+    for qa in qa_pairs:
+        try:
+            chunks = search_vector(qa["question"], index_path, top_k)
+            
+            included_turns = set()
+            for chunk in chunks:
+                for t in range(chunk['turn_start'], chunk['turn_end'] + 1):
+                    included_turns.add(t)
+            
+            hit = compute_hit(qa.get('source_turns', []), included_turns)
+
+            chunk_text = "\n\n".join(c['text'] for c in chunks)
+            system_content = f'아래는 대화 내용입니다. 이 내용을 근거로 답하세요.\n\n{chunk_text}'
+
+            messages = [
+                {'role': 'system', 'content': system_content},
+                {'role': 'user', "content": qa['question']},
+            ]
+            answer, usage, _ = chat_completion(
+                messages, _ANSWER_MODEL, api_key, max_tokens=512, temperature=0.0
+            )
+            kf_score = keyfact_score(answer, qa.get("key_facts", []))
+
+            results.append({
+                "question": qa['question'],
+                "expected":     qa.get("expected", ""),
+                "answer":       answer,
+                "usage":        usage,
+                "hit":          hit,
+                "type":         qa.get("type", "single"),
+                "source_turns": qa.get("source_turns", []),
+                "key_facts":    qa.get("key_facts", []),
+                "keyfact_score": kf_score,
+            })
+
+        except Exception as e:
+            results.append({
+                "question":     qa["question"],
+                "expected":     qa.get("expected", ""),
+                "answer":       str(e),
+                "usage":        {},
+                "hit":          0.0,
+                "type":         qa.get("type", "single"),
+                "source_turns": qa.get("source_turns", []),
+                "key_facts":    qa.get("key_facts", []),
+                "keyfact_score": 0.0 if qa.get("key_facts") else None,
+            })
+    return results
+
+
 # ── LLM-as-judge ─────────────────────────────────────────────────────────────
 
 def build_judge_prompt(question: str, expected: str, answer: str) -> str:
@@ -342,6 +433,8 @@ def main() -> None:
                     help="기존 판정 JSON으로 채점만 재실행")
     ap.add_argument("--output", type=Path, default=None, metavar="PATH",
                     help="결과 JSON 저장 경로")
+    ap.add_argument("--top-k", type=int, default=3, metavar="N",
+                    help="검색할 토픽/청크 수 (기본값: 3)")
     args = ap.parse_args()
 
     # TODO: 구현
@@ -361,6 +454,8 @@ def main() -> None:
 
     modes = args.modes.split(",")
     all_results = {}
+    if args.output and args.output.exists():
+        all_results = json.loads(args.output.read_text(encoding="utf-8"))
 
     # --load-judgments 단독: 기존 결과 파일을 바로 출력
     if args.load_judgments:
@@ -399,7 +494,9 @@ def main() -> None:
     # 4. modes 루프
     for mode in modes:
         if mode == "baseline":
-            results = run_baseline(qa_pairs, session, session_dir, api_key)
+            results = run_baseline(qa_pairs, session, session_dir, api_key, top_k=args.top_k)
+        elif mode == "vector":
+            results = run_vector(qa_pairs, session, session_dir, api_key, top_k=args.top_k)
         else:
             print(f"아직 구현되지 않은 모드: {mode}")
             continue
@@ -416,6 +513,7 @@ def main() -> None:
 
     # 7. output 저장
     if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(all_results, ensure_ascii=False, indent=2), encoding="utf-8")
 
 

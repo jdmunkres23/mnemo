@@ -25,10 +25,13 @@ python -m parser --input PATH --output-dir PATH
 
 python -m evaluator --session PATH --modes baseline,vector
 python -m evaluator --session PATH --modes vector,vector_adjacent,vector_kg
-python -m evaluator --session PATH --qa-pairs PATH   # 기존 QA 쌍 재사용
-python -m evaluator --session PATH --max-chars 0     # 청크 크기 제한 없음 — 전체를 하나의 청크로 (짧은 대화용)
-python -m evaluator --no-judge                       # 답변만 생성 (Claude 외부 채점용)
-python -m evaluator --load-judgments PATH            # 기존 판정으로 채점만
+python -m evaluator --session PATH --qa-pairs PATH              # 기존 QA 쌍 재사용
+python -m evaluator --session PATH --output PATH                # 결과 저장 경로 지정 (기존 모드 결과 보존)
+python -m evaluator --session PATH --max-chars 0                # 청크 크기 제한 없음 — 전체를 하나의 청크로 (짧은 대화용)
+python -m evaluator --no-judge                                  # 답변만 생성 (Claude 외부 채점용)
+python -m evaluator --load-judgments PATH                       # 기존 판정으로 채점만
+
+python -m src.usage_tracker                          # 오늘(UTC) 모델별 사용량·한도·잔여 토큰 출력
 ```
 
 ---
@@ -41,7 +44,8 @@ project-root/
 │   ├── parser.py          Claude.ai 내보내기 JSON → session.json 변환
 │   ├── models.py          Pydantic 데이터 스키마 (블록 타입 포함)
 │   ├── server.py          HTTP 서버 + API 라우팅
-│   ├── _groq.py           Groq API 래퍼 (urllib 기반, Cloudflare UA 우회)
+│   ├── _groq.py           Groq API 래퍼 (urllib 기반, Cloudflare UA 우회, usage_tracker 연동)
+│   ├── usage_tracker.py   Groq 일별 사용량 기록 + 분당 한도 자동 대기
 │   ├── indexer.py         fastembed 임베딩 + 벡터 검색
 │   ├── knowledge_graph.py 엔티티/관계 추출 + SQLite KG (벡터 엔티티 포함)
 │   ├── evaluator.py       RAG 평가 파이프라인
@@ -61,11 +65,23 @@ project-root/
 │   (각 phase 폴더: [주제]_theory.md + [번호]_[주제]_notebook.md, AI 무관 영역은 _overview.md)
 ├── conversations_learning/       변환된 세션 데이터 (gitignore)
 ├── eval_data/             평가용 합성 대화·QA 쌍·결과 (gitignore)
+├── usage/                 Groq 일별 사용량 기록 (gitignore, UTC 날짜별 .jsonl + limits.json)
 ├── tests/
 ├── pyproject.toml
 ├── README.md
 └── .env                   Groq API 키 (gitignore)
 ```
+
+---
+
+## Groq 사용량 관리
+
+`src/usage_tracker.py` — `_groq.py`의 `chat_completion` 성공 시 자동 호출.
+
+- **일별 기록**: `usage/YYYY-MM-DD.jsonl` (UTC 기준). 날짜가 바뀌면 이전 파일 자동 삭제.
+- **한도 테이블**: `usage/limits.json` — 당일 UTC 최초 실행 시 Groq 공식 페이지에서 TPD를 파싱해 캐시. 파싱 실패 시 코드 내 기본값 사용.
+- **자동 대기**: 분당 남은 토큰이 한도의 25% 미만이면 리셋까지 자동 sleep.
+- **사용량 확인**: `python -m src.usage_tracker` → 모델별 사용/한도/잔여 토큰 테이블 출력.
 
 ---
 

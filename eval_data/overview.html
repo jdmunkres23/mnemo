@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>eval_data 구성 개요</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+      padding: 32px 24px;
+      line-height: 1.6;
+    }
+
+    h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 4px; }
+    h2 { font-size: 1.15rem; font-weight: 700; }
+    h3 { font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 12px; }
+
+    .subtitle { color: #64748b; font-size: 0.9rem; margin-bottom: 32px; }
+
+    /* file tree */
+    .file-tree {
+      background: #1e293b;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-family: 'Consolas', monospace;
+      font-size: 0.82rem;
+      line-height: 2;
+      margin-bottom: 36px;
+    }
+    .file-tree .dir  { color: #7dd3fc; }
+    .file-tree .file { color: #a5f3fc; }
+    .file-tree .desc { color: #64748b; margin-left: 8px; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 0.8rem; }
+
+    /* session cards */
+    .sessions { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 36px; }
+    @media (max-width: 900px) { .sessions { grid-template-columns: 1fr; } }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 18px 22px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .session-id-badge {
+      background: #ede9fe;
+      color: #6d28d9;
+      font-family: monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+    .session-id-badge.long { background: #dbeafe; color: #1d4ed8; }
+    .card-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; }
+    .card-meta { font-size: 0.78rem; color: #64748b; }
+    .card-body { padding: 18px 22px; }
+
+    .stat-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .stat {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      flex: 1;
+      min-width: 80px;
+      text-align: center;
+    }
+    .stat .val { font-size: 1.4rem; font-weight: 700; }
+    .stat .lbl { font-size: 0.72rem; color: #94a3b8; margin-top: 2px; }
+    .stat.green .val { color: #10b981; }
+    .stat.blue .val  { color: #3b82f6; }
+    .stat.amber .val { color: #f59e0b; }
+    .stat.red .val   { color: #ef4444; }
+
+    /* topic list */
+    .topic-list { list-style: none; }
+    .topic-list li {
+      padding: 7px 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 0.82rem;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .topic-list li:last-child { border-bottom: none; }
+    .turn-badge {
+      background: #f1f5f9;
+      color: #475569;
+      font-family: monospace;
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+      margin-top: 1px;
+      min-width: 36px;
+      text-align: center;
+    }
+
+    /* QA table */
+    .qa-section { margin-top: 36px; }
+    .qa-section + .qa-section { margin-top: 48px; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      font-size: 0.82rem;
+    }
+    thead th {
+      background: #f8fafc;
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      font-weight: 600;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    tbody tr:hover { background: #f8fafc; }
+    tbody td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: top;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .badge-single    { background: #dbeafe; color: #1e40af; }
+    .badge-paraphrase { background: #fef3c7; color: #92400e; }
+    .badge-multihop  { background: #ffe4e6; color: #9f1239; }
+
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .bar-bg {
+      flex: 1;
+      height: 6px;
+      background: #f1f5f9;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+    .bar-fill.full  { background: #10b981; }
+    .bar-fill.half  { background: #f59e0b; }
+    .bar-fill.zero  { background: #ef4444; width: 4px !important; }
+    .score-num { font-family: monospace; font-size: 0.78rem; font-weight: 700; min-width: 28px; text-align: right; }
+    .score-num.full { color: #10b981; }
+    .score-num.half { color: #f59e0b; }
+    .score-num.zero { color: #ef4444; }
+
+    .key-facts { display: flex; flex-wrap: wrap; gap: 4px; }
+    .kf {
+      background: #f1f5f9;
+      color: #475569;
+      font-family: monospace;
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .q-text { color: #334155; }
+    .turns-ref { font-family: monospace; font-size: 0.75rem; color: #94a3b8; }
+
+    /* summary comparison */
+    .compare {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      padding: 24px;
+      margin-top: 36px;
+    }
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 16px;
+    }
+    .compare-col h4 { font-size: 0.85rem; font-weight: 600; margin-bottom: 10px; color: #475569; }
+    .compare-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 0.82rem;
+    }
+    .compare-row:last-child { border-bottom: none; }
+    .compare-row .label { color: #64748b; }
+    .compare-row .value { font-weight: 600; font-family: monospace; }
+    .good  { color: #10b981; }
+    .mid   { color: #f59e0b; }
+    .bad   { color: #ef4444; }
+
+    .insight {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 0.83rem;
+      color: #78350f;
+      margin-top: 20px;
+      line-height: 1.7;
+    }
+    .insight strong { color: #92400e; }
+  </style>
+</head>
+<body>
+
+<h1>eval_data/ 구성 개요</h1>
+<p class="subtitle">RAG 평가용 합성 대화 · QA 쌍 · baseline 결과 — Phase 3~4</p>
+
+<!-- File Tree -->
+<div class="file-tree">
+  <div><span class="dir">eval_data/</span></div>
+  <div>&nbsp;&nbsp;├── <span class="file">eval-short-001.session.json</span><span class="desc">합성 대화 (짧은 버전, 22턴 / 11 exchanges)</span></div>
+  <div>&nbsp;&nbsp;├── <span class="file">eval-short-001.qa_pairs.json</span><span class="desc">단답형·paraphrase QA 8개</span></div>
+  <div>&nbsp;&nbsp;├── <span class="file">eval-long-001.session.json</span><span class="desc">합성 대화 (긴 버전, 50턴+ / 25+ exchanges)</span></div>
+  <div>&nbsp;&nbsp;├── <span class="file">eval-long-001.qa_pairs.json</span><span class="desc">single·paraphrase·multihop QA 15개</span></div>
+  <div>&nbsp;&nbsp;├── <span class="file">results-short.json</span><span class="desc">short baseline 평가 결과 (hit + keyfact_score)</span></div>
+  <div>&nbsp;&nbsp;├── <span class="file">results-long.json</span><span class="desc">long baseline 평가 결과</span></div>
+  <div>&nbsp;&nbsp;├── <span class="file">eval_data_prompt.md</span><span class="desc">QA 쌍 생성 프롬프트 템플릿</span></div>
+  <div>&nbsp;&nbsp;└── <span class="file">eval_scoring_prompt.md</span><span class="desc">채점 프롬프트 템플릿 (Claude Sonnet judge용)</span></div>
+</div>
+
+<!-- Session Overview Cards -->
+<h3>합성 대화 세션</h3>
+<div class="sessions">
+
+  <!-- Short Session -->
+  <div class="card">
+    <div class="card-header">
+      <span class="session-id-badge">eval-short-001</span>
+      <div>
+        <div class="card-title">SaaS 기업 DCF 가치평가 모델링과 할인 시점 실수</div>
+        <div class="card-meta">2025-03-10 &nbsp;·&nbsp; 22 turns (11 exchanges)</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="stat-row">
+        <div class="stat blue"><div class="val">22</div><div class="lbl">turns</div></div>
+        <div class="stat green"><div class="val">8</div><div class="lbl">QA쌍</div></div>
+        <div class="stat green"><div class="val">7</div><div class="lbl">single</div></div>
+        <div class="stat amber"><div class="val">1</div><div class="lbl">paraphrase</div></div>
+      </div>
+      <h3>대화 흐름</h3>
+      <ul class="topic-list">
+        <li><span class="turn-badge">T0–1</span>성장률 가정 (1~3년 35%, 4~5년 20%)</li>
+        <li><span class="turn-badge">T2–3</span>EBIT 마진 설정 (18% → 25% 점진 개선)</li>
+        <li><span class="turn-badge">T4–5</span>FCF 정의 · 법인세 22% · NOPAT</li>
+        <li><span class="turn-badge">T6–7</span>WACC = 11.5% 설정</li>
+        <li><span class="turn-badge">T8–9</span>할인 시점 off-by-one 실수 발견 → t=1 수정</li>
+        <li><span class="turn-badge">T10–11</span>mid-year convention 설명</li>
+        <li><span class="turn-badge">T12–13</span>터미널 밸류 (고든 성장 모형, g=2.5%)</li>
+        <li><span class="turn-badge">T14–15</span>영구성장률 g 상한 근거</li>
+        <li><span class="turn-badge">T16–17</span>EV → 주주가치 (순현금 +30억)</li>
+        <li><span class="turn-badge">T18–19</span>주당가치 (주식수 1,000만주)</li>
+        <li><span class="turn-badge">T20–21</span>WACC 민감도 (±1%p → ±9~10%)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Long Session -->
+  <div class="card">
+    <div class="card-header">
+      <span class="session-id-badge long">eval-long-001</span>
+      <div>
+        <div class="card-title">오픈 LLM LoRA 파인튜닝 디버깅: NaN 발산·데이터 누수·토크나이저·서빙</div>
+        <div class="card-meta">2025-03-12 &nbsp;·&nbsp; 50+ turns (25+ exchanges)</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="stat-row">
+        <div class="stat blue"><div class="val">50+</div><div class="lbl">turns</div></div>
+        <div class="stat blue"><div class="val">15</div><div class="lbl">QA쌍</div></div>
+        <div class="stat green"><div class="val">7</div><div class="lbl">single</div></div>
+        <div class="stat amber"><div class="val">3</div><div class="lbl">paraphrase</div></div>
+        <div class="stat red"><div class="val">5</div><div class="lbl">multihop</div></div>
+      </div>
+      <h3>대화 흐름</h3>
+      <ul class="topic-list">
+        <li><span class="turn-badge">T0–1</span>LoRA 어댑터 설정 (r=16, alpha=32)</li>
+        <li><span class="turn-badge">T2–3</span>max_seq_len = 2048</li>
+        <li><span class="turn-badge">T4–5</span>배치 설정 (per=4, accum=8 → 유효 32)</li>
+        <li><span class="turn-badge">T6–7</span>학습률 2e-4, cosine 스케줄러</li>
+        <li><span class="turn-badge">T8–13</span>손실 spike → NaN: warmup 0.03 + lr 1e-4 + bf16 + clip 1.0</li>
+        <li><span class="turn-badge">T14–15</span>OOM → gradient_checkpointing</li>
+        <li><span class="turn-badge">T20–27</span>평가 정확도 0.99 → 데이터 누수 발견 (sha1, 1800건) → 0.86</li>
+        <li><span class="turn-badge">T28–31</span>토크나이저: pad=eos 라벨 마스킹(-100) 문제</li>
+        <li><span class="turn-badge">T36–38</span>양자화 서빙 (nf4 → 0.83 정확도)</li>
+        <li><span class="turn-badge">T38–43</span>vLLM 8001 포트 서빙 + chat template 불일치 → 반복 생성</li>
+        <li><span class="turn-badge">T46–49</span>max_model_len 4096 → 2048 최적화</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- QA Pairs: Short -->
+<div class="qa-section">
+  <div class="section-header">
+    <h2>QA 쌍 + baseline 결과 — eval-short-001</h2>
+    <span class="badge badge-single">short</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40%">질문</th>
+        <th>타입</th>
+        <th>source_turns</th>
+        <th>key_facts</th>
+        <th>Hit</th>
+        <th>KeyFact</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="q-text">매출 성장률을 예측 구간별로 각각 몇 %로 가정했나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[1, 2]</td>
+        <td><div class="key-facts"><span class="kf">35</span><span class="kf">20</span></div></td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="q-text">EBIT(영업이익) 마진을 어떻게 변화시키기로 했나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[3]</td>
+        <td><div class="key-facts"><span class="kf">18</span><span class="kf">25</span></div></td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="q-text">할인율(WACC)을 몇 %로 적용했나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[7]</td>
+        <td><div class="key-facts"><span class="kf">11.5</span></div></td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="q-text">1년차 현금흐름 현재가치가 과대평가된 원인은 무엇이었고 어떻게 고쳤나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[8, 9]</td>
+        <td><div class="key-facts"><span class="kf">t=1</span><span class="kf">1부터</span></div></td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill half" style="width:50%"></div></div>
+            <span class="score-num half">0.5</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="q-text">터미널 밸류는 어떤 방법으로, 영구성장률은 몇 %로 구했나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[13]</td>
+        <td><div class="key-facts"><span class="kf">고든</span><span class="kf">2.5</span></div></td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="q-text">기업가치(EV)에서 주주가치로 갈 때, 보유 순현금 얼마를 어떻게 반영했나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[16, 17]</td>
+        <td><div class="key-facts"><span class="kf">30억</span></div></td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="q-text">주당가치를 계산할 때 총 주식수를 몇 주로 두었나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[18, 19]</td>
+        <td><div class="key-facts"><span class="kf">1000만</span></div></td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="q-text">할인율이 1%p 어긋나면 기업가치가 대략 얼마나 변한다고 봤나요?</td>
+        <td><span class="badge badge-paraphrase">paraphrase</span></td>
+        <td class="turns-ref">[21]</td>
+        <td><div class="key-facts"><span class="kf">9~10</span></div></td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div>
+            <span class="score-num full">1.0</span>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- QA Pairs: Long -->
+<div class="qa-section">
+  <div class="section-header">
+    <h2>QA 쌍 + baseline 결과 — eval-long-001</h2>
+    <span class="badge badge-multihop">long</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:38%">질문</th>
+        <th>타입</th>
+        <th>source_turns</th>
+        <th>key_facts</th>
+        <th>Hit</th>
+        <th>KeyFact</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="q-text">LoRA 어댑터의 rank와 alpha를 각각 얼마로 잡았나요?</td>
+        <td><span class="badge badge-paraphrase">paraphrase</span></td>
+        <td class="turns-ref">[1]</td>
+        <td><div class="key-facts"><span class="kf">16</span><span class="kf">32</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div><span class="score-num full">1.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div><span class="score-num full">1.0</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">학습 시 최대 시퀀스 길이를 얼마로 설정했나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[3]</td>
+        <td><div class="key-facts"><span class="kf">2048</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div><span class="score-num full">1.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div><span class="score-num full">1.0</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">per-device 배치와 그래디언트 누적을 곱한 유효 배치 크기는 얼마였나요?</td>
+        <td><span class="badge badge-paraphrase">paraphrase</span></td>
+        <td class="turns-ref">[5]</td>
+        <td><div class="key-facts"><span class="kf">32</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div><span class="score-num full">1.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div><span class="score-num full">1.0</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">처음에 설정한 학습률과 스케줄러 종류는 무엇이었나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[7]</td>
+        <td><div class="key-facts"><span class="kf">2e-4</span><span class="kf">cosine</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div><span class="score-num full">1.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill full" style="width:100%"></div></div><span class="score-num full">1.0</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">학습 손실이 초반에 튀어(spike) NaN이 난 원인과, 조정한 설정들은 무엇이었나요?</td>
+        <td><span class="badge badge-multihop">multihop</span></td>
+        <td class="turns-ref">[9, 11, 13]</td>
+        <td><div class="key-facts"><span class="kf">0.03</span><span class="kf">1e-4</span><span class="kf">bf16</span><span class="kf">1.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill half" style="width:67%"></div></div><span class="score-num half">0.67</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill half" style="width:50%"></div></div><span class="score-num half">0.5</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">학습 중 OOM을 해결하려고 켠 설정은 무엇이었나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[15]</td>
+        <td><div class="key-facts"><span class="kf">gradient_checkpointing</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero" style="width:0%"></div></div><span class="score-num zero">0.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero" style="width:0%"></div></div><span class="score-num zero">0.0</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">평가 정확도가 0.99로 비정상적으로 높았던 원인과 그 처리 방법은 무엇이었나요?</td>
+        <td><span class="badge badge-multihop">multihop</span></td>
+        <td class="turns-ref">[21, 23, 25]</td>
+        <td><div class="key-facts"><span class="kf">누수</span><span class="kf">sha1</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill half" style="width:50%"></div></div><span class="score-num half">0.5</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">중복 제거는 무엇을 기준으로 했고, 데이터 누수로 몇 건 정도가 새어 있었나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[23, 25]</td>
+        <td><div class="key-facts"><span class="kf">sha1</span><span class="kf">1800</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">전체 데이터셋 규모는 몇 건이었나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[24, 25]</td>
+        <td><div class="key-facts"><span class="kf">42000</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">데이터 누수를 제거한 뒤 평가 정확도는 얼마로 바뀌었나요?</td>
+        <td><span class="badge badge-multihop">multihop</span></td>
+        <td class="turns-ref">[25, 27]</td>
+        <td><div class="key-facts"><span class="kf">0.86</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">모델이 답을 너무 일찍 끝내던 토크나이저 문제의 원인과 해결책은 무엇이었나요?</td>
+        <td><span class="badge badge-multihop">multihop</span></td>
+        <td class="turns-ref">[29, 31]</td>
+        <td><div class="key-facts"><span class="kf">eos</span><span class="kf">-100</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">LoRA를 병합한 뒤 4-bit(nf4)로 양자화했을 때 정확도는 얼마였나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[37, 38]</td>
+        <td><div class="key-facts"><span class="kf">0.83</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">추론 서빙은 무엇으로, 몇 번 포트에 띄웠나요?</td>
+        <td><span class="badge badge-single">single</span></td>
+        <td class="turns-ref">[39, 40]</td>
+        <td><div class="key-facts"><span class="kf">vllm</span><span class="kf">8001</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill half" style="width:50%"></div></div><span class="score-num half">0.5</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">생성이 멈추지 않고 같은 말을 반복하던 문제의 원인과 해결책은 무엇이었나요?</td>
+        <td><span class="badge badge-multihop">multihop</span></td>
+        <td class="turns-ref">[41, 43]</td>
+        <td><div class="key-facts"><span class="kf">eos</span><span class="kf">repetition_penalty</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+      </tr>
+      <tr>
+        <td class="q-text">서빙 지연을 줄이려고 최대 컨텍스트 길이(max_model_len)를 얼마로 낮췄나요?</td>
+        <td><span class="badge badge-paraphrase">paraphrase</span></td>
+        <td class="turns-ref">[47, 49]</td>
+        <td><div class="key-facts"><span class="kf">4096</span><span class="kf">2048</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill zero"></div></div><span class="score-num zero">0.0</span></div></td>
+        <td><div class="score-bar"><div class="bar-bg"><div class="bar-fill half" style="width:50%"></div></div><span class="score-num half">0.5</span></div></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Summary Comparison -->
+<div class="compare">
+  <h2>baseline 결과 비교 요약</h2>
+  <div class="compare-grid">
+    <div class="compare-col">
+      <h4>eval-short-001 (짧은 대화)</h4>
+      <div class="compare-row"><span class="label">QA 수</span><span class="value">8개</span></div>
+      <div class="compare-row"><span class="label">평균 Hit Rate</span><span class="value good">1.00</span></div>
+      <div class="compare-row"><span class="label">평균 KeyFact Score</span><span class="value good">0.94</span></div>
+      <div class="compare-row"><span class="label">0점 문항 수</span><span class="value good">0개</span></div>
+      <div class="compare-row"><span class="label">QA 타입</span><span class="value">single×7, para×1</span></div>
+    </div>
+    <div class="compare-col">
+      <h4>eval-long-001 (긴 대화)</h4>
+      <div class="compare-row"><span class="label">QA 수</span><span class="value">15개</span></div>
+      <div class="compare-row"><span class="label">평균 Hit Rate</span><span class="value bad">0.31</span></div>
+      <div class="compare-row"><span class="label">평균 KeyFact Score</span><span class="value bad">0.40</span></div>
+      <div class="compare-row"><span class="label">0점 문항 수</span><span class="value bad">10개 (67%)</span></div>
+      <div class="compare-row"><span class="label">QA 타입</span><span class="value">single×7, para×3, multi×5</span></div>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>핵심 관찰:</strong> baseline(고정 크기 청크)은 짧은 대화에서 Hit Rate 1.0을 기록하지만, 긴 대화에서는 <strong>0.31로 급락</strong>합니다.
+    긴 대화의 후반부 내용(T20 이후: 데이터 누수·토크나이저·서빙)은 고정 청크 크기에서 검색 범위 밖으로 밀려나기 때문입니다.
+    이것이 Phase 4에서 <strong>토픽 기반 청크 + 요약 임베딩(vector 모드)</strong>으로 전환하는 동기가 됩니다.
+    multihop 질문 5개(source_turns 3개 이상)는 baseline에서 모두 0점 — 인접 게이팅/KG 없이는 멀리 떨어진 턴을 연결할 수 없음을 보여줍니다.
+  </div>
+</div>
+
+</body>
+</html>
