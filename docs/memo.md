@@ -361,3 +361,38 @@ top_k=1로 vector 모드를 실험(`--top-k 1` 옵션 필요해 evaluator.py에 
 ### Phase 5 진행 조건 재검토
 
 기존 "Hit Rate 1.00이라 Phase 5 불필요" 결론은 위 발견 1(무필터 착시)에 기반한 것이었으므로 **폐기**. 인덱스를 고친 뒤 top-k=1로 보면 multihop hit이 0.07까지 떨어지므로, **인접 게이팅이 필요한 실제 시나리오가 이미 이 데이터셋에 존재함**. 다음 단계는 같은(고쳐진) 인덱스로 top-k=3 재평가 → multihop 회복 여부 확인 → 회복 폭이 부족하면 Phase 5(인접 게이팅) 진행.
+
+### top-k=3 재평가 결과 (수정된 인덱스, baseline·vector 동일 답변 모델)
+
+top-k=1 실험 당시 `_ANSWER_MODEL`을 일시적으로 `llama-3.3-70b-versatile`로 바꿔 (`llama-4-scout` TPD 95% 소진) baseline·vector 둘 다 같은 모델로 재측정.
+
+**긴 대화 (15개, top-k=3)**
+
+| 모드 | Hit Rate | key_facts | avg tokens |
+|---|---|---|---|
+| baseline | 0.98 | 8.3 | 2,540 |
+| vector | 0.79 | 8.2 | 1,371 |
+
+타입별:
+
+| 타입 | baseline Hit | vector Hit | baseline keyfact | vector keyfact |
+|---|---|---|---|---|
+| single | 1.00 | 0.86 | 8.57 | 7.9 |
+| paraphrase | 1.00 | 1.00 | 8.33 | 10.0 |
+| multihop | 0.93 | 0.57 | 8.0 | 7.5 |
+
+**해석**
+- 평균 토큰이 10,391(버그 상태) → 1,371(수정 후)로 줄었는데도 vector Hit Rate가 여전히 baseline보다 낮음 → **"lost in the middle"은 원인이 아니었던 것으로 최종 기각.**
+- vector의 single-hop 미스 2건(양자화 정확도 turn 37/38, vLLM 포트 turn 39/40)을 확인해보니 둘 다 **토픽 경계에 걸친 turn** — multihop과 동일한 근본 원인(사실 하나가 여러 토픽에 흩어짐).
+- paraphrase는 Hit Rate는 baseline과 동일(1.00)하지만 keyfact에서 vector가 뚜렷이 우세(10.0 vs 8.33) — 의미 기반 검색의 이점이 확인된 유일한 지점.
+
+**재진단**: 토픽 분할이 정상화된 것 자체는 맞는 방향이지만, 그 부작용으로 하나의 사실이 여러 개의 작은 토픽에 흩어지는 경우가 늘어남. top-k=3만으로는 흩어진 토픽을 다 못 모음 — Small-to-Big 구조 자체의 한계라기보다 **인접 토픽을 고려 안 하는 검색 방식의 한계.**
+
+### 결정: Phase 5(인접 게이팅) 진행
+
+baseline이 Hit Rate·keyfact 모두 근소 우위지만:
+1. paraphrase에서 vector의 확실한 우위(keyfact +1.67)가 확인됨 — 의미 기반 검색 자체는 유효.
+2. 이후 phase(vector_adjacent, vector_kg)는 모두 vector 위에 얹는 구조라 baseline은 확장 계획이 없음.
+3. vector의 약점(multihop + 경계 인접 single-hop)이 정확히 인접 게이팅이 겨냥하는 문제와 일치.
+
+위 근거로 **인접 게이팅을 구현 후 재평가**하기로 결정. 인접 게이팅 적용 후에도 baseline 대비 개선(Correctness +0.3 기준)이 없으면 vector 경로 자체를 재검토.
