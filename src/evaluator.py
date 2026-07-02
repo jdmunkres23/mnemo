@@ -16,7 +16,7 @@ from pathlib import Path
 from src._groq import chat_completion, load_env_key
 
 _FAST_MODEL = "llama-3.1-8b-instant"       # 분류, QA 생성, judge 등 단순 작업
-_ANSWER_MODEL = "llama-3.3-70b-versatile"  # RAG 답변 생성
+_ANSWER_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"  # RAG 답변 생성
 
 
 # ── Hit Rate 계산 ─────────────────────────────────────────────────────────────
@@ -452,6 +452,8 @@ def main() -> None:
 
     modes = args.modes.split(",")
     all_results = {}
+    if args.output and args.output.exists():
+        all_results = json.loads(args.output.read_text(encoding="utf-8"))
 
     # --load-judgments 단독: 기존 결과 파일을 바로 출력
     if args.load_judgments:
