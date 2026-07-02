@@ -122,8 +122,9 @@ function renderSidebar() {
 }
 
 // ── 턴 렌더링 ──
-function renderTurnEl(turn) {
+function renderTurnEl(turn, index) {
   const div = document.createElement('div');
+  if (index !== undefined) div.dataset.turnIndex = index;
   if (turn.role === 'user') {
     div.className = 'msg-row user';
     const textBlocks = (turn.blocks || []).filter(b => b.type === 'text');
@@ -142,8 +143,17 @@ function renderTurnEl(turn) {
   return div;
 }
 
-function renderTurns(turns, container) {
-  (turns || []).forEach(turn => container.appendChild(renderTurnEl(turn)));
+function renderTurns(turns, container, withIndex) {
+  (turns || []).forEach((turn, i) => container.appendChild(renderTurnEl(turn, withIndex ? i : undefined)));
+}
+
+// AI 채팅 출처 칩에서 호출: 대화 뷰어의 해당 턴으로 스크롤 + 하이라이트
+function scrollToTurn(index) {
+  const el = document.querySelector(`[data-turn-index="${index}"]`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add('turn-highlight');
+  setTimeout(() => el.classList.remove('turn-highlight'), 1600);
 }
 
 function renderBranchSection(container) {
@@ -214,7 +224,7 @@ async function loadConv(id) {
     _activeBranchIdx = 0;
     _activeBranches = session.branches || null;
 
-    renderTurns(session.turns, inner);
+    renderTurns(session.turns, inner, true);
 
     if (_activeBranches && _activeBranches.length > 1) {
       renderBranchSection(inner);

@@ -331,6 +331,19 @@ textarea::placeholder{color:var(--text3)}
 .ai-bubble.ai h1,.ai-bubble.ai h2,.ai-bubble.ai h3{font-size:14px;font-weight:600;margin:8px 0 4px}
 .ai-bubble.ai strong{font-weight:600}
 
+.ai-msg-col{display:flex;flex-direction:column;max-width:90%}
+.ai-source-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.ai-source-label{font-size:11px;color:var(--text3)}
+.ai-source-chip{font-size:11px;color:var(--text2);background:transparent;border:1px solid var(--border2);border-radius:12px;padding:2px 9px;cursor:pointer;font-family:var(--font);transition:background .1s,opacity .1s}
+.ai-source-chip:hover{background:var(--hover);opacity:1 !important}
+
+/* AI 채팅 출처 칩 클릭 시 대화 뷰어에서 잠깐 강조 */
+.turn-highlight{animation:turn-flash 1.6s ease}
+@keyframes turn-flash{
+  0%{background:rgba(255,196,0,.25)}
+  100%{background:transparent}
+}
+
 /* 로딩 스피너 (점 세 개) */
 .ai-thinking{display:flex;align-items:center;gap:4px;padding:6px 2px;flex-shrink:0}
 .ai-thinking span{width:6px;height:6px;border-radius:50%;background:var(--text3);animation:ai-dot 1.2s infinite ease-in-out}

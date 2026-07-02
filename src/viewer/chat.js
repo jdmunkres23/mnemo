@@ -2,7 +2,7 @@
 let aiState = {
   sessionId: null,
   chatId: null,
-  messages: [],          // { role, content }
+  messages: [],          // { role, content, meta?: { query_type, search_results } }
   sessionTitle: '',
   loading: false,
 };
@@ -310,11 +310,11 @@ async function sendAIMessage() {
   _setThinking(true);
 
   try {
-    const systemPrompt = await _getRagContext(aiState.sessionId, text);
+    const routing = await _getRagContext(aiState.sessionId, text);
 
     const groqMessages = [
-      { role: 'system', content: systemPrompt },
-      ...aiState.messages,
+      { role: 'system', content: routing.system },
+      ...aiState.messages.map(m => ({ role: m.role, content: m.content })),
     ];
 
     const res = await fetch('/api/groq-proxy', {
@@ -334,7 +334,11 @@ async function sendAIMessage() {
       throw new Error(data.error || `HTTP ${res.status}`);
     }
 
-    aiState.messages.push({ role: 'assistant', content: data.content });
+    aiState.messages.push({
+      role: 'assistant',
+      content: data.content,
+      meta: { query_type: routing.query_type, search_results: routing.search_results },
+    });
     _updateRateBadge(data.rate_limit, data.usage);
     await _saveChatHistory();
 
@@ -348,7 +352,7 @@ async function sendAIMessage() {
   }
 }
 
-// ── RAG: 인덱싱 후 쿼리 라우팅 결과(system 프롬프트) 반환 ──
+// ── RAG: 인덱싱 후 쿼리 라우팅 결과(system 프롬프트 + 출처 메타) 반환 ──
 async function _getRagContext(sessionId, query) {
   // 1. 인덱싱 (이미 돼 있으면 서버에서 재사용)
   await fetch('/api/index-session', {
@@ -365,7 +369,11 @@ async function _getRagContext(sessionId, query) {
   });
   if (!res.ok) throw new Error('검색 실패');
   const data = await res.json();
-  return data.system || '당신은 도움이 되는 AI 어시스턴트입니다.';
+  return {
+    system: data.system || '당신은 도움이 되는 AI 어시스턴트입니다.',
+    query_type: data.query_type || 'simple',
+    search_results: data.search_results || [],
+  };
 }
 
 // ── 채팅 기록 ──
@@ -462,12 +470,47 @@ function _renderAIMessages() {
     div.className = `ai-bubble-row ${msg.role === 'user' ? 'user' : 'ai'}`;
     const html = msg.role === 'user'
       ? `<div class="ai-bubble user">${escHtml(msg.content).replace(/\n/g, '<br>')}</div>`
-      : `<div class="ai-bubble ai">${renderMarkdown(msg.content)}</div>`;
+      : `<div class="ai-msg-col"><div class="ai-bubble ai">${renderMarkdown(msg.content)}</div>${_renderSourceChips(msg.meta)}</div>`;
     div.innerHTML = html;
     list.appendChild(div);
   });
 
   list.scrollTop = list.scrollHeight;
+}
+
+// AI 답변 아래 출처 표시: retrieval이면 턴 범위 칩(클릭 시 대화 뷰어로 스크롤), 아니면 안내 텍스트
+function _renderSourceChips(meta) {
+  if (!meta) return '';
+
+  if (meta.query_type === 'simple') {
+    return `<div class="ai-source-row"><span class="ai-source-label">출처: 세션 데이터 미사용</span></div>`;
+  }
+  if (meta.query_type === 'analytical') {
+    return `<div class="ai-source-row"><span class="ai-source-label">출처: 전체 토픽 요약 기반</span></div>`;
+  }
+
+  const results = meta.search_results || [];
+  if (!results.length) {
+    return `<div class="ai-source-row"><span class="ai-source-label">출처: 관련 내용을 찾지 못함</span></div>`;
+  }
+
+  // 유사도 내림차순 정렬 — 점수는 그대로 텍스트로 보여주되, 결과 내 상대적 유사도에 따라
+  // 진하기(불투명도)를 다르게 줘서 가장 관련 있는 걸 시각적으로 바로 구분되게 함
+  const sorted = [...results].sort((a, b) => (b.score || 0) - (a.score || 0));
+  const scores = sorted.map(r => r.score || 0);
+  const maxScore = Math.max(...scores);
+  const minScore = Math.min(...scores);
+  const range = maxScore - minScore || 1;
+
+  const chips = sorted.map(r => {
+    const label = r.turn_start === r.turn_end ? `turn ${r.turn_start}` : `turn ${r.turn_start}-${r.turn_end}`;
+    const score = typeof r.score === 'number' ? ` · ${r.score.toFixed(2)}` : '';
+    const tip = escHtml((r.summary || '').slice(0, 120));
+    const norm = typeof r.score === 'number' ? (r.score - minScore) / range : 1;
+    const opacity = (0.5 + norm * 0.5).toFixed(2); // 결과 중 최저 0.5 ~ 최고 1.0
+    return `<button class="ai-source-chip" style="opacity:${opacity}" onclick="scrollToTurn(${r.turn_start})" title="${tip}">${label}${score}</button>`;
+  }).join('');
+  return `<div class="ai-source-row">${chips}</div>`;
 }
 
 function _appendAISystemMsg(text) {
