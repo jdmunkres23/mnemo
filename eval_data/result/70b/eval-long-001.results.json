@@ -373,15 +373,15 @@
     {
       "question": "LoRA 어댑터의 rank와 alpha를 각각 얼마로 잡았나요?",
       "expected": "rank 16, alpha 32로 잡았습니다.",
-      "answer": "LoRA 어댑터의 rank는 16, alpha는 32로 잡았습니다. 따라서, alpha/r은 2.0이 됩니다. 이는 LoRA의 전형적인 설정입니다.",
+      "answer": "LoRA 어댑터의 rank는 16, alpha는 32로 잡았습니다.",
       "usage": {
-        "queue_time": 0.051663045,
-        "prompt_tokens": 5864,
-        "prompt_time": 0.409553663,
-        "completion_tokens": 45,
-        "completion_time": 0.186394871,
-        "total_tokens": 5909,
-        "total_time": 0.595948534
+        "queue_time": 0.009899211,
+        "prompt_tokens": 1210,
+        "prompt_time": 0.064561924,
+        "completion_tokens": 22,
+        "completion_time": 0.037111591,
+        "total_tokens": 1232,
+        "total_time": 0.101673515
       },
       "hit": 1.0,
       "type": "paraphrase",
@@ -397,15 +397,15 @@
     {
       "question": "학습 시 최대 시퀀스 길이를 얼마로 설정했나요?",
       "expected": "max_seq_len 2048로 설정했습니다.",
-      "answer": "2048로 설정했습니다.",
+      "answer": "학습 시 최대 시퀀스 길이를 **2048**로 설정했습니다.",
       "usage": {
-        "queue_time": 0.051489976,
-        "prompt_tokens": 7613,
-        "prompt_time": 0.673958609,
-        "completion_tokens": 7,
-        "completion_time": 0.025503517,
-        "total_tokens": 7620,
-        "total_time": 0.699462126
+        "queue_time": 0.009932945,
+        "prompt_tokens": 1229,
+        "prompt_time": 0.073389318,
+        "completion_tokens": 20,
+        "completion_time": 0.059559627,
+        "total_tokens": 1249,
+        "total_time": 0.132948945
       },
       "hit": 1.0,
       "type": "single",
@@ -420,9 +420,17 @@
     {
       "question": "per-device 배치와 그래디언트 누적을 곱한 유효 배치 크기는 얼마였나요?",
       "expected": "32입니다 (per_device 4 × grad_accum 8).",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97770, Requested 6179. Please try again in 56m51.935999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "유효 배치 크기는 32였습니다. per-device 배치 크기는 4, 그래디언트 누적은 8이었기 때문에 두 값을 곱한 결과입니다.",
+      "usage": {
+        "queue_time": 0.307471102,
+        "prompt_tokens": 1277,
+        "prompt_time": 0.231639786,
+        "completion_tokens": 43,
+        "completion_time": 0.138519075,
+        "total_tokens": 1320,
+        "total_time": 0.370158861
+      },
+      "hit": 1.0,
       "type": "paraphrase",
       "source_turns": [
         5
@@ -430,14 +438,22 @@
       "key_facts": [
         "32"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 1.0
     },
     {
       "question": "처음에 설정한 학습률과 스케줄러 종류는 무엇이었나요?",
       "expected": "학습률 2e-4, cosine 스케줄러로 시작했습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97552, Requested 8129. Please try again in 1h21m48.384s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "초기 학습률은 2e-4, 스케줄러는 cosine 스케줄러였습니다.",
+      "usage": {
+        "queue_time": 0.03171092,
+        "prompt_tokens": 1282,
+        "prompt_time": 0.065983232,
+        "completion_tokens": 26,
+        "completion_time": 0.059351479,
+        "total_tokens": 1308,
+        "total_time": 0.125334711
+      },
+      "hit": 1.0,
       "type": "single",
       "source_turns": [
         7
@@ -446,14 +462,22 @@
         "2e-4",
         "cosine"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 1.0
     },
     {
       "question": "학습 손실이 초반에 튀어(spike) NaN이 난 원인과, 그걸 잡으려고 조정한 설정들은 무엇이었나요?",
       "expected": "초기 학습률이 높고 warmup이 없던 게 원인이며, warmup_ratio 0.03 + 학습률 1e-4 하향 + bf16 전환 + max_grad_norm 1.0 클리핑으로 잡았습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97333, Requested 6493. Please try again in 55m5.664s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "초반에 학습 손실이 튀어 NaN이 나는 원인은 학습률이 초기에 слишком 높게 설정되어, 초반 불안정 구간을 잘 넘지 못하고 손실이 폭증하여 NaN이 발생하게 된 것입니다.\n\n이를 잡으려고 조정한 설정들은 다음과 같습니다.\n\n1. **초기 학습률을 낮추기**: 2e-4에서 1e-4로 낮춤으로써 초반에 quá급한 학습을避케 하여 손실 폭증을 막습니다.\n2. **warmup 적용**: 전체 스텝의 3%期间 동안 학습률을 0부터 천천히 증가시켜, 초반 불안정 구간을 안전하게 통과할 수 있도록 합니다.\n3. **fp16에서 bf16으로 전환**: fp16은 표현 범위가狭く, 큰 그래디언트에 의해 NaN이 발생하기 쉽습니다. bf16으로 전환하면, 넓은 표현 범위를 갖추어 큰 그래디언트에도 NaN이 발생하지 않도록 합니다.\n4. **그래디언트 클리핑**: 그래디언트의(norm)을 1.0으로 제한하여, 그래디언트가 quá급한 폭증을 막아, 손실을 안정화합니다.",
+      "usage": {
+        "queue_time": 0.010388495,
+        "prompt_tokens": 1281,
+        "prompt_time": 0.12909223,
+        "completion_tokens": 283,
+        "completion_time": 0.976908634,
+        "total_tokens": 1564,
+        "total_time": 1.106000864
+      },
+      "hit": 1.0,
       "type": "multihop",
       "source_turns": [
         9,
@@ -466,14 +490,22 @@
         "bf16",
         "1.0"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 0.75
     },
     {
       "question": "학습 중 OOM을 해결하려고 켠 설정은 무엇이었나요?",
       "expected": "gradient_checkpointing을 켰습니다(bf16과 함께).",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97116, Requested 6475. Please try again in 51m42.624s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "학습 중 OOM(Out of Memory)을 해결하려고 켠 설정은 다음과 같았다.\n\n1.  **gradient\\_checkpointing**: forward에서 모든 중간 활성화(activation)를 메모리에 들고 있지 않고, backward 때 필요한 부분을 다시 계산한다. 메모리를 크게 아끼는 대신 연산이 늘어나므로 **학습이 약 20% 정도 느려진다.**\n2.  **per\\_device\\_batch를 4에서 2로 줄이고 grad\\_accum을 8에서 16으로 올리기**: 유효 배치 32를 유지하면서 순간 메모리 사용량을 절반으로 줄이는 방법이다.",
+      "usage": {
+        "queue_time": 0.009969509,
+        "prompt_tokens": 1275,
+        "prompt_time": 0.077524319,
+        "completion_tokens": 150,
+        "completion_time": 0.363485302,
+        "total_tokens": 1425,
+        "total_time": 0.441009621
+      },
+      "hit": 1.0,
       "type": "single",
       "source_turns": [
         15
@@ -486,9 +518,17 @@
     {
       "question": "평가 정확도가 0.99로 비정상적으로 높았던 원인과 그 처리 방법은 무엇이었나요?",
       "expected": "train/test 데이터 누수(중복 샘플)가 원인이며, 정규화 후 sha1로 중복 제거한 다음 분할하도록 순서를 바꿔 해결했습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96898, Requested 8297. Please try again in 1h14m48.48s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "그 원인은 데이터 누수(data leakage)였습니다. 데이터 누수는 모델이 학습 데이터에 포함된 정보를 평가 데이터에 직접 또는 간접적으로 적용할 때 발생합니다. 이로 인해 모델은 실제로 문제를 푼 것이 아니라, 평가 데이터의 정보를 이용하여 쉽게 정답을 맞출 수 있게 됩니다. \n\n이 문제를 해결한 방법은 train과 test 데이터셋이 분리된 상태인지 확인한 뒤, 다시 분할하여 중복되는 샘플이 없도록 하는 것입니다. 이와 같은 방식을 통해 0.99에서 0.86으로 정확도가 낮아졌습니다.",
+      "usage": {
+        "queue_time": 0.219012834,
+        "prompt_tokens": 1332,
+        "prompt_time": 0.130642928,
+        "completion_tokens": 139,
+        "completion_time": 0.666204158,
+        "total_tokens": 1471,
+        "total_time": 0.796847086
+      },
+      "hit": 0.3333333333333333,
       "type": "multihop",
       "source_turns": [
         21,
@@ -499,14 +539,22 @@
         "누수",
         "sha1"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 0.5
     },
     {
       "question": "중복 제거는 무엇을 기준으로 했고, 데이터 누수로 몇 건 정도가 새어 있었나요?",
       "expected": "정규화한 텍스트의 sha1 해시를 기준으로 했고, 약 1,800건이 train/test에 겹쳐 있었습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96684, Requested 6643. Please try again in 47m54.528s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "중복 제거는 정규화 후 해시 기준으로 진행되었습니다. 데이터 누수로 약 1,800건이 새어 있었습니다. 이는 전체 데이터 42,000건 중에서 약 4.3%에 해당합니다.",
+      "usage": {
+        "queue_time": 0.009958489,
+        "prompt_tokens": 1268,
+        "prompt_time": 0.064106178,
+        "completion_tokens": 54,
+        "completion_time": 0.161303171,
+        "total_tokens": 1322,
+        "total_time": 0.225409349
+      },
+      "hit": 1.0,
       "type": "single",
       "source_turns": [
         23,
@@ -516,14 +564,22 @@
         "sha1",
         "1800"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 0.5
     },
     {
       "question": "전체 데이터셋 규모는 몇 건이었나요?",
       "expected": "42,000건이었습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96467, Requested 6371. Please try again in 40m52.031999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "전체 데이터셋은 42,000건이었습니다.但是 중복된 샘플을 제거한 후에는 약 40,200건이었습니다.",
+      "usage": {
+        "queue_time": 0.032712269,
+        "prompt_tokens": 1239,
+        "prompt_time": 0.064093944,
+        "completion_tokens": 39,
+        "completion_time": 0.095587355,
+        "total_tokens": 1278,
+        "total_time": 0.159681299
+      },
+      "hit": 1.0,
       "type": "single",
       "source_turns": [
         24,
@@ -532,14 +588,22 @@
       "key_facts": [
         "42000"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 1.0
     },
     {
       "question": "데이터 누수를 제거한 뒤 평가 정확도는 얼마로 바뀌었나요?",
       "expected": "0.99에서 0.86으로 떨어졌습니다(이게 실제 성능).",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96246, Requested 6640. Please try again in 41m33.504s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "0.86으로 바뀌었습니다. 원래 0.99 였는데 데이터 누수를 제거하고 난 후에 0.86이 되었다고 합니다.",
+      "usage": {
+        "queue_time": 0.009725912,
+        "prompt_tokens": 1326,
+        "prompt_time": 0.070265125,
+        "completion_tokens": 39,
+        "completion_time": 0.16039867,
+        "total_tokens": 1365,
+        "total_time": 0.230663795
+      },
+      "hit": 0.5,
       "type": "multihop",
       "source_turns": [
         25,
@@ -548,14 +612,22 @@
       "key_facts": [
         "0.86"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 1.0
     },
     {
       "question": "모델이 답을 너무 일찍 끝내던 토크나이저 문제의 원인과 해결책은 무엇이었나요?",
       "expected": "pad_token이 eos_token과 같은데 라벨 마스킹을 안 해 패딩(=eos)에까지 loss가 걸린 게 원인이며, pad 토큰을 분리하고 라벨을 -100으로 마스킹(padding_side right)해 해결했습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96031, Requested 8401. Please try again in 1h3m49.248s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "원인은 pad_token이 eos_token과 같아, 모델이 pad로 채워진 부분에서도 eos를 배웠기 때문입니다. \n\n이 문제를 해결하려면 pad_token과 eos_token을 다르게 설정해야 합니다. \n\ntokenizer.add_special_tokens({'pad_token': '[PAD]'})를 사용해서 pad_token을 따로 설정해주면, 모델이 eos_token을 일찍 내지 않고 올바른 길이로 پاسخ을 생성할 수 있습니다.",
+      "usage": {
+        "queue_time": 0.009662997,
+        "prompt_tokens": 1352,
+        "prompt_time": 0.069018986,
+        "completion_tokens": 98,
+        "completion_time": 0.52402559,
+        "total_tokens": 1450,
+        "total_time": 0.593044576
+      },
+      "hit": 0.5,
       "type": "multihop",
       "source_turns": [
         29,
@@ -565,14 +637,22 @@
         "eos",
         "-100"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 0.5
     },
     {
       "question": "LoRA를 병합한 뒤 4-bit(nf4)로 양자화했을 때 정확도는 얼마였나요?",
       "expected": "0.83이었습니다 (bf16은 0.86).",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 95813, Requested 6386. Please try again in 31m39.936s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "4-bit(nf4) 양자화 후 정확도는 0.83입니다.",
+      "usage": {
+        "queue_time": 0.009582076,
+        "prompt_tokens": 1398,
+        "prompt_time": 0.071506235,
+        "completion_tokens": 20,
+        "completion_time": 0.049841761,
+        "total_tokens": 1418,
+        "total_time": 0.121347996
+      },
+      "hit": 0.5,
       "type": "single",
       "source_turns": [
         37,
@@ -581,14 +661,22 @@
       "key_facts": [
         "0.83"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 1.0
     },
     {
       "question": "추론 서빙은 무엇으로, 몇 번 포트에 띄웠나요?",
       "expected": "vLLM으로 8001 포트에 띄웠습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 95592, Requested 8413. Please try again in 57m40.32s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "추론 서빙은 **vLLM**으로 하고, 포트는 **8001**에 띄웠습니다.",
+      "usage": {
+        "queue_time": 0.009585385,
+        "prompt_tokens": 1302,
+        "prompt_time": 0.066114901,
+        "completion_tokens": 28,
+        "completion_time": 0.064580584,
+        "total_tokens": 1330,
+        "total_time": 0.130695485
+      },
+      "hit": 0.5,
       "type": "single",
       "source_turns": [
         39,
@@ -598,14 +686,22 @@
         "vllm",
         "8001"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 1.0
     },
     {
       "question": "생성이 멈추지 않고 같은 말을 반복하던 문제의 원인과 해결책은 무엇이었나요?",
       "expected": "서빙 chat template이 학습 포맷과 달라 eos가 빠진 게 원인이며, 템플릿을 학습과 통일(eos 포함)하고 stop 토큰 지정 + repetition_penalty 1.1을 더해 해결했습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 95375, Requested 8395. Please try again in 54m17.279999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "생성이 멈추지 않고 같은 말을 반복하던 문제는 두 가지 원인이 있었는데요.\n\n첫 번째는 템플릿이 학습에 사용한 포맷과 달랐다는 점이었습니다. 학습에 استفاده된 템플릿과 다르게 eos 토큰이 템플릿에 포함되지 않았기 때문에, 모델은 종료 신호를 인식할 수 없었습니다. 또한, 학습 때와 동일한 템플릿을 사용하여 템플릿을 통일해야 하는 문제도 있었습니다.\n\n두 번째는 학습 시 eos 토큰이 pad 토큰과 같은 경우, 모델이 \"빨리 eos를 내라\"는 내용을 학습하여 추론 시 한두 단어 만에 eos를 내고 멈추는 문제가 있었습니다.\n\n해결책으로는 학습 때 사용한 템플릿과 동일한 템플릿을 사용하고, 추론 시 stop 토큰으로 eos를 설정하며, 반복을 억제하기 위해 repetition_penalty를 적용하는 것이었습니다. 또한, pad 토큰과 eos 토큰을 다르게 설정하거나, 라벨에 pad 위치를 마스킹하여 pad 토큰을 모델이 eos 토큰으로 학습하지 않도록 하는 설정을 변경해야 했습니다.",
+      "usage": {
+        "queue_time": 0.00995325,
+        "prompt_tokens": 1299,
+        "prompt_time": 0.066063571,
+        "completion_tokens": 299,
+        "completion_time": 1.125697872,
+        "total_tokens": 1598,
+        "total_time": 1.191761443
+      },
+      "hit": 0.5,
       "type": "multihop",
       "source_turns": [
         41,
@@ -615,14 +711,22 @@
         "eos",
         "repetition_penalty"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 1.0
     },
     {
       "question": "서빙 지연을 줄이려고 최대 컨텍스트 길이(max_model_len)를 얼마로 낮췄나요?",
       "expected": "4096에서 2048로 낮췄습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 95157, Requested 8136. Please try again in 47m25.152s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": " máximo 컨텍스트 길이(max_model_len)를 4096에서 2048로 낮췄습니다.",
+      "usage": {
+        "queue_time": 0.009786189,
+        "prompt_tokens": 1205,
+        "prompt_time": 0.10563918,
+        "completion_tokens": 26,
+        "completion_time": 0.078312466,
+        "total_tokens": 1231,
+        "total_time": 0.183951646
+      },
+      "hit": 1.0,
       "type": "paraphrase",
       "source_turns": [
         47,
@@ -632,7 +736,7 @@
         "4096",
         "2048"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 1.0
     }
   ]
 }
