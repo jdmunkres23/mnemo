@@ -373,9 +373,17 @@
     {
       "question": "LoRA 어댑터의 rank와 alpha를 각각 얼마로 잡았나요?",
       "expected": "rank 16, alpha 32로 잡았습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 98791, Requested 6155. Please try again in 1h11m13.344s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "LoRA 어댑터의 rank는 16, alpha는 32로 잡았습니다. 따라서, alpha/r은 2.0이 됩니다. 이는 LoRA의 전형적인 설정입니다.",
+      "usage": {
+        "queue_time": 0.051663045,
+        "prompt_tokens": 5864,
+        "prompt_time": 0.409553663,
+        "completion_tokens": 45,
+        "completion_time": 0.186394871,
+        "total_tokens": 5909,
+        "total_time": 0.595948534
+      },
+      "hit": 1.0,
       "type": "paraphrase",
       "source_turns": [
         1
@@ -384,14 +392,22 @@
         "16",
         "32"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 1.0
     },
     {
       "question": "학습 시 최대 시퀀스 길이를 얼마로 설정했나요?",
       "expected": "max_seq_len 2048로 설정했습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 98573, Requested 8125. Please try again in 1h36m27.072s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
-      "usage": {},
-      "hit": 0.0,
+      "answer": "2048로 설정했습니다.",
+      "usage": {
+        "queue_time": 0.051489976,
+        "prompt_tokens": 7613,
+        "prompt_time": 0.673958609,
+        "completion_tokens": 7,
+        "completion_time": 0.025503517,
+        "total_tokens": 7620,
+        "total_time": 0.699462126
+      },
+      "hit": 1.0,
       "type": "single",
       "source_turns": [
         3
@@ -399,12 +415,12 @@
       "key_facts": [
         "2048"
       ],
-      "keyfact_score": 0.0
+      "keyfact_score": 1.0
     },
     {
       "question": "per-device 배치와 그래디언트 누적을 곱한 유효 배치 크기는 얼마였나요?",
       "expected": "32입니다 (per_device 4 × grad_accum 8).",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 98355, Requested 6646. Please try again in 1h12m0.863999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97770, Requested 6179. Please try again in 56m51.935999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "paraphrase",
@@ -419,7 +435,7 @@
     {
       "question": "처음에 설정한 학습률과 스케줄러 종류는 무엇이었나요?",
       "expected": "학습률 2e-4, cosine 스케줄러로 시작했습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 98137, Requested 8129. Please try again in 1h30m13.824s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97552, Requested 8129. Please try again in 1h21m48.384s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "single",
@@ -435,7 +451,7 @@
     {
       "question": "학습 손실이 초반에 튀어(spike) NaN이 난 원인과, 그걸 잡으려고 조정한 설정들은 무엇이었나요?",
       "expected": "초기 학습률이 높고 warmup이 없던 게 원인이며, warmup_ratio 0.03 + 학습률 1e-4 하향 + bf16 전환 + max_grad_norm 1.0 클리핑으로 잡았습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97919, Requested 6493. Please try again in 1h3m31.968s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97333, Requested 6493. Please try again in 55m5.664s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "multihop",
@@ -455,7 +471,7 @@
     {
       "question": "학습 중 OOM을 해결하려고 켠 설정은 무엇이었나요?",
       "expected": "gradient_checkpointing을 켰습니다(bf16과 함께).",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97703, Requested 6475. Please try again in 1h0m9.792s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97116, Requested 6475. Please try again in 51m42.624s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "single",
@@ -470,7 +486,7 @@
     {
       "question": "평가 정확도가 0.99로 비정상적으로 높았던 원인과 그 처리 방법은 무엇이었나요?",
       "expected": "train/test 데이터 누수(중복 샘플)가 원인이며, 정규화 후 sha1로 중복 제거한 다음 분할하도록 순서를 바꿔 해결했습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97483, Requested 8297. Please try again in 1h23m13.92s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96898, Requested 8297. Please try again in 1h14m48.48s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "multihop",
@@ -488,7 +504,7 @@
     {
       "question": "중복 제거는 무엇을 기준으로 했고, 데이터 누수로 몇 건 정도가 새어 있었나요?",
       "expected": "정규화한 텍스트의 sha1 해시를 기준으로 했고, 약 1,800건이 train/test에 겹쳐 있었습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97268, Requested 6643. Please try again in 56m19.104s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96684, Requested 6643. Please try again in 47m54.528s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "single",
@@ -505,7 +521,7 @@
     {
       "question": "전체 데이터셋 규모는 몇 건이었나요?",
       "expected": "42,000건이었습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97047, Requested 6371. Please try again in 49m13.152s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96467, Requested 6371. Please try again in 40m52.031999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "single",
@@ -521,7 +537,7 @@
     {
       "question": "데이터 누수를 제거한 뒤 평가 정확도는 얼마로 바뀌었나요?",
       "expected": "0.99에서 0.86으로 떨어졌습니다(이게 실제 성능).",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96829, Requested 6640. Please try again in 49m57.216s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96246, Requested 6640. Please try again in 41m33.504s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "multihop",
@@ -537,7 +553,7 @@
     {
       "question": "모델이 답을 너무 일찍 끝내던 토크나이저 문제의 원인과 해결책은 무엇이었나요?",
       "expected": "pad_token이 eos_token과 같은데 라벨 마스킹을 안 해 패딩(=eos)에까지 loss가 걸린 게 원인이며, pad 토큰을 분리하고 라벨을 -100으로 마스킹(padding_side right)해 해결했습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96610, Requested 8401. Please try again in 1h12m9.504s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96031, Requested 8401. Please try again in 1h3m49.248s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "multihop",
@@ -554,7 +570,7 @@
     {
       "question": "LoRA를 병합한 뒤 4-bit(nf4)로 양자화했을 때 정확도는 얼마였나요?",
       "expected": "0.83이었습니다 (bf16은 0.86).",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96392, Requested 6386. Please try again in 40m0.192s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 95813, Requested 6386. Please try again in 31m39.936s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "single",
@@ -570,7 +586,7 @@
     {
       "question": "추론 서빙은 무엇으로, 몇 번 포트에 띄웠나요?",
       "expected": "vLLM으로 8001 포트에 띄웠습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96174, Requested 8413. Please try again in 1h6m3.168s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 95592, Requested 8413. Please try again in 57m40.32s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "single",
@@ -587,7 +603,7 @@
     {
       "question": "생성이 멈추지 않고 같은 말을 반복하던 문제의 원인과 해결책은 무엇이었나요?",
       "expected": "서빙 chat template이 학습 포맷과 달라 eos가 빠진 게 원인이며, 템플릿을 학습과 통일(eos 포함)하고 stop 토큰 지정 + repetition_penalty 1.1을 더해 해결했습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 95958, Requested 8395. Please try again in 1h2m40.991999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 95375, Requested 8395. Please try again in 54m17.279999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "multihop",
@@ -604,7 +620,7 @@
     {
       "question": "서빙 지연을 줄이려고 최대 컨텍스트 길이(max_model_len)를 얼마로 낮췄나요?",
       "expected": "4096에서 2048로 낮췄습니다.",
-      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 95738, Requested 8136. Please try again in 55m47.135999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+      "answer": "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kvam0yhxfcmssyx9a0dcwyk6` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 95157, Requested 8136. Please try again in 47m25.152s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
       "usage": {},
       "hit": 0.0,
       "type": "paraphrase",
