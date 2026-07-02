@@ -229,11 +229,11 @@ def detect_topic_boundaries(session: dict, api_key: str) -> list[int]:
     # 7. 예외 → _uniform_boundaries(session)
     import re
     try:
-        turns = session['turn']
+        turns = session['turns']
         user_msgs = []
         for i, turn in enumerate(turns):
             if turn['role'] == 'user':
-                text = " ".json(b['text'] for b in turn['blocks'] if b['type'] == 'text')
+                text = " ".join(b['text'] for b in turn['blocks'] if b['type'] == 'text')
                 user_msgs.append((i, text))
 
         if len(user_msgs) <= 1:
@@ -441,7 +441,7 @@ def search_vector(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
     if not index_path.exists():
         return []
     data = json.loads(index_path.read_text(encoding='utf-8'))
-    query_vec = list(embed_texts(query)[0])
+    query_vec = list(embed_texts([query])[0])
     for item in data:
         item['score'] = cosine_similarity(query_vec, item['embedding'])
     return sorted(data, key=lambda x: x['score'], reverse=True)[:top_k]
