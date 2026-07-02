@@ -187,24 +187,6 @@
     </div>
   </div>
 
-  <!-- 설정 패널 (토글) -->
-  <div class="ai-settings" id="aiSettings" style="display:none">
-    <div class="settings-field">
-      <label class="settings-label">Groq API 키</label>
-      <input type="password" id="groqApiKeyInput" class="settings-input" placeholder="gsk_...">
-      <span class="settings-hint" id="aiKeyHint"></span>
-    </div>
-    <div class="settings-field">
-      <label class="settings-label">기본 모델</label>
-      <select id="aiModelSelSettings" class="settings-input">
-        <option value="llama-3.1-8b-instant">Llama 3.1 8B (빠름)</option>
-        <option value="llama-3.3-70b-versatile">Llama 3.3 70B (정확)</option>
-        <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
-      </select>
-    </div>
-    <button class="settings-save-btn" id="aiSaveKeyBtn">저장</button>
-  </div>
-
   <!-- 채팅 뷰 (기본) -->
   <div class="ai-chat-view" id="aiChatView">
     <div class="ai-msg-list" id="aiMsgList">
@@ -225,6 +207,12 @@
           </button>
           <div class="ai-model-popover" id="aiModelPopover"></div>
         </div>
+        <select id="aiRoutingModeQuick" class="ai-routing-mode-quick" title="쿼리 라우팅 모드">
+          <option value="auto">자동 분류</option>
+          <option value="simple">Simple 고정</option>
+          <option value="analytical">Analytical 고정</option>
+          <option value="retrieval">Retrieval 고정</option>
+        </select>
         <span class="rate-badge" id="rateBadge" style="display:none"></span>
       </div>
       <div class="ai-input-row">
@@ -241,6 +229,61 @@
     <div class="ai-hist-full-empty" id="aiHistEmpty" style="display:none">
       <i class="ti ti-messages-off"></i>
       <p>저장된 채팅이 없습니다</p>
+    </div>
+  </div>
+</aside>
+
+<!-- 설정 패널 (AI 채팅 패널 오른쪽에 별도로 열림) -->
+<aside class="ai-settings-panel hidden" id="aiSettingsPanel">
+  <div class="ai-panel-top">
+    <div class="ai-panel-top-left">
+      <span class="ai-panel-title">설정</span>
+    </div>
+    <div class="ai-panel-top-right">
+      <button class="hico" onclick="toggleAISettings()" title="닫기"><i class="ti ti-x"></i></button>
+    </div>
+  </div>
+
+  <div class="ai-settings-view">
+    <div class="settings-section">
+      <div class="settings-section-title">API</div>
+      <div class="settings-field">
+        <label class="settings-label">Groq API 키</label>
+        <input type="password" id="groqApiKeyInput" class="settings-input" placeholder="gsk_...">
+        <span class="settings-hint" id="aiKeyHint"></span>
+      </div>
+      <button class="settings-save-btn" id="aiSaveKeyBtn">API 키 저장</button>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">모델</div>
+      <div class="settings-field">
+        <label class="settings-label">답변 모델</label>
+        <select id="aiModelSelSettings" class="settings-input"></select>
+      </div>
+      <div class="settings-field">
+        <label class="settings-label">쿼리 라우팅 모델</label>
+        <select id="aiRoutingModelSel" class="settings-input"></select>
+        <span class="settings-hint">질문을 simple/analytical/retrieval로 분류할 때 쓰는 모델</span>
+      </div>
+      <div class="settings-field">
+        <label class="settings-label">라우팅 모드</label>
+        <select id="aiRoutingModeSel" class="settings-input">
+          <option value="auto">자동 분류</option>
+          <option value="simple">Simple 고정</option>
+          <option value="analytical">Analytical 고정</option>
+          <option value="retrieval">Retrieval 고정</option>
+        </select>
+        <span class="settings-hint">고정하면 매번 분류하지 않고 지정한 방식만 사용 (AI 채팅 툴바에서도 바로 바꿀 수 있음)</span>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">
+        오늘 Groq 사용량
+        <span class="settings-usage-reset" id="aiUsageReset"></span>
+      </div>
+      <div id="aiUsageList" class="ai-usage-list"></div>
     </div>
   </div>
 </aside>

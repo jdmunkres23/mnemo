@@ -81,6 +81,10 @@ def _make_handler(data_dir: Path):
                 self._api_groq_models(api_key)
                 return
 
+            if path == "/api/usage-status":
+                self._api_usage_status()
+                return
+
             self._not_found()
 
         # ── POST ─────────────────────────────────────────────────────────────
@@ -358,6 +362,14 @@ def _make_handler(data_dir: Path):
                 logger.warning("groq-models error: %s", exc)
                 self._json({"error": "모델 목록 조회 실패"}, 502)
 
+        def _api_usage_status(self):
+            try:
+                from src import usage_tracker
+                self._json(usage_tracker.get_status())
+            except Exception as exc:
+                logger.warning("usage-status error: %s", exc)
+                self._json({"error": "사용량 조회 실패"}, 500)
+
         def _api_index_session(self, body: dict):
             session_id = body.get("session_id", "")
             if not session_id or "/" in session_id or ".." in session_id:
@@ -384,6 +396,8 @@ def _make_handler(data_dir: Path):
             query = body.get("query", "")
             top_k = int(body.get("top_k", 3))
             api_key = body.get('api_key', '')
+            routing_model = body.get('routing_model') or 'llama-3.1-8b-instant'
+            forced_type = body.get('forced_type') or None
 
             if not session_id or not query:
                 self._json({"error": "session_id and query are required"}, 400)
@@ -403,7 +417,10 @@ def _make_handler(data_dir: Path):
                 session_dir = self._data_dir / session_id
                 index_path = build_vector_index(session, session_dir, api_key)
                 topics = json.loads(index_path.read_text(encoding='utf-8'))
-                result = route_query(question=query, topics=topics, index_path=index_path, api_key=api_key, top_k=top_k)
+                result = route_query(
+                    question=query, topics=topics, index_path=index_path, api_key=api_key, top_k=top_k,
+                    routing_model=routing_model, forced_type=forced_type,
+                )
                 self._json(result)
             except Exception as exc:
                 logger.warning("query-semantic error: %s", exc)

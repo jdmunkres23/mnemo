@@ -8,7 +8,7 @@ import json
 import re
 import time
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _USAGE_DIR = Path(__file__).parent.parent / "usage"
@@ -191,7 +191,8 @@ def throttle_if_needed(rate_limit: dict) -> None:
             time.sleep(wait)
 
 
-if __name__ == "__main__":
+def get_status() -> dict:
+    """오늘(UTC) 모델별 사용량·한도 + 리셋까지 남은 시간. 설정 패널/CLI 공용."""
     today = _utc_today()
     limits = _fetch_tpd_limits()
 
@@ -202,26 +203,52 @@ if __name__ == "__main__":
             if line.strip():
                 entries.append(json.loads(line))
 
-    # 오늘 사용한 모델만 추려서 출력, 없으면 한도 테이블 전체
     used_models = {e["model"] for e in entries}
     all_models = used_models | set(limits.keys())
+
+    models = []
+    for model in sorted(all_models):
+        used = sum(e["total_tokens"] for e in entries if e["model"] == model)
+        limit = limits.get(model, 0)
+        remaining = max(0, limit - used) if limit else 0
+        pct = round(used / limit * 100, 1) if limit else 0.0
+        models.append({
+            "model": model, "used": used, "limit": limit,
+            "remaining": remaining, "pct": pct,
+        })
+
+    now = datetime.now(timezone.utc)
+    reset_at = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    return {
+        "date": today,
+        "models": models,
+        "call_count": len(entries),
+        "total_tokens": sum(e["total_tokens"] for e in entries),
+        "first_call": entries[0]["time"] if entries else None,
+        "last_call": entries[-1]["time"] if entries else None,
+        "reset_utc": reset_at.isoformat(),
+        "reset_seconds": int((reset_at - now).total_seconds()),
+    }
+
+
+if __name__ == "__main__":
+    status = get_status()
+    today = status["date"]
 
     print(f"\n  Groq 일별 사용량  ({today} UTC)\n")
     print(f"  {'모델':<48}  {'사용':>8}  {'한도':>8}  {'남은':>8}  {'소진':>5}")
     print("  " + "-" * 78)
-    for model in sorted(all_models):
-        used  = sum(e["total_tokens"] for e in entries if e["model"] == model)
-        limit = limits.get(model, 0)
-        remaining = max(0, limit - used) if limit else 0
-        pct   = f"{used/limit*100:.1f}%" if limit else "—"
-        limit_str = f"{limit:,}" if limit else "—"
-        remaining_str = f"{remaining:,}" if limit else "—"
-        print(f"  {model:<48}  {used:>8,}  {limit_str:>8}  {remaining_str:>8}  {pct:>5}")
+    for m in status["models"]:
+        limit_str = f"{m['limit']:,}" if m["limit"] else "—"
+        remaining_str = f"{m['remaining']:,}" if m["limit"] else "—"
+        pct_str = f"{m['pct']:.1f}%" if m["limit"] else "—"
+        print(f"  {m['model']:<48}  {m['used']:>8,}  {limit_str:>8}  {remaining_str:>8}  {pct_str:>5}")
 
-    if entries:
-        print(f"\n  총 호출 수: {len(entries)}회")
-        print(f"  총 사용 토큰: {sum(e['total_tokens'] for e in entries):,}")
-        print(f"  첫 호출: {entries[0]['time']}  마지막 호출: {entries[-1]['time']}")
+    if status["call_count"]:
+        print(f"\n  총 호출 수: {status['call_count']}회")
+        print(f"  총 사용 토큰: {status['total_tokens']:,}")
+        print(f"  첫 호출: {status['first_call']}  마지막 호출: {status['last_call']}")
     else:
         print("\n  오늘 사용 기록 없음")
     print()

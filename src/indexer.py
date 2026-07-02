@@ -468,12 +468,13 @@ def should_be_retrieval(question: str) -> bool:
     """
     return bool(_RETRIEVAL_PATTERN.search(question))
 
-def classify_query(question: str, api_key: str) -> str:
+def classify_query(question: str, api_key: str, model: str = 'llama-3.1-8b-instant') -> str:
     """질문을 simple / analytical / retrieval 로 분류한다. (노트북 04-2 섹션 1 참고)
 
     입력:
       question: "chunk_size 기본값이 얼마야?"
       api_key: Groq API 키
+      model: 분류에 쓸 모델 (설정 패널에서 선택 가능, 기본 llama-3.1-8b-instant)
 
     반환:
       "simple"     — 세션 없이 LLM이 알 수 있는 일반 지식
@@ -506,7 +507,7 @@ def classify_query(question: str, api_key: str) -> str:
     try:
         content, usage, _ = chat_completion(
             [{'role': 'user', 'content': prompt}],
-            'llama-3.1-8b-instant', api_key, max_tokens=20, temperature=0.0
+            model, api_key, max_tokens=20, temperature=0.0
         )
         answer = content.strip().lower().split()[0]
 
@@ -561,15 +562,20 @@ def route_query(
     index_path: Path,
     api_key: str,
     top_k: int = 3,
+    routing_model: str = 'llama-3.1-8b-instant',
+    forced_type: str | None = None,
 ) -> dict:
     """질문을 분류하고 유형별 컨텍스트를 구성한다.
 
     입력:
-      question:   분류할 질문
-      topics:     [{"position": int, "summary": str, ...}, ...]
-      index_path: vector_index.json 경로
-      api_key:    Groq API 키
-      top_k:      retrieval 경로에서 가져올 토픽 수
+      question:      분류할 질문
+      topics:        [{"position": int, "summary": str, ...}, ...]
+      index_path:    vector_index.json 경로
+      api_key:       Groq API 키
+      top_k:         retrieval 경로에서 가져올 토픽 수
+      routing_model: classify_query에 쓸 모델 (설정 패널에서 선택 가능)
+      forced_type:   "simple"|"analytical"|"retrieval" 중 하나면 분류 생략하고 그대로 사용
+                      (설정 패널에서 라우팅을 수동 고정한 경우)
     출력:
       {
         "query_type":     "simple" | "analytical" | "retrieval",
@@ -578,15 +584,18 @@ def route_query(
       }
 
     구현 순서:
-    1. classify_query(question, api_key) → query_type
+    1. forced_type이 유효한 값이면 그대로 query_type으로 사용, 아니면 classify_query(question, api_key, routing_model) → query_type
     2. "simple"     → system = "당신은 도움이 되는 AI 어시스턴트입니다.", search_results = []
     3. "analytical" → system = build_analytical_context(topics),       search_results = []
     4. "retrieval"  → search_results = search_vector(question, index_path, top_k)
                        system = build_retrieval_context(search_results)
     5. return {"query_type": query_type, "system": system, "search_results": search_results}
     """
-    query_type = classify_query(question, api_key)
-    
+    if forced_type in ('simple', 'analytical', 'retrieval'):
+        query_type = forced_type
+    else:
+        query_type = classify_query(question, api_key, routing_model)
+
     if query_type == 'simple':
         system = '당신은 도움이 되는 AI 어시스턴트입니다.'
         search_results = []
