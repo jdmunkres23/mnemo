@@ -15,12 +15,14 @@ CHUNK_SIZE = 2000  # 기본 청크 크기 (글자 수)
 _model = None  # 지연 초기화 (첫 embed 호출 시)
 
 
+_CACHE_DIR = Path.home() / ".cache" / "fastembed"
+
 def _get_model():
     """fastembed TextEmbedding 인스턴스 반환 (싱글턴)."""
     global _model
     if _model is None:
         from fastembed import TextEmbedding
-        _model = TextEmbedding(EMBEDDING_MODEL)
+        _model = TextEmbedding(EMBEDDING_MODEL, cache_dir=str(_CACHE_DIR))
     return _model
 
 
@@ -58,7 +60,6 @@ def format_turn(turn: dict) -> str | None:
     - b["type"] == "text" 인 블록만 필터링
     - f"[{role_label}]\n{text}"
     """
-    # TODO
     role_label = "사용자" if turn['role'] == 'user' else "AI"
     text = "\n".join(b['text'] for b in turn['blocks'] if b ['type'] == 'text')
     if text:
@@ -174,6 +175,440 @@ def search(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
     # 5. score 내림차순 정렬 → [:top_k] 반환
     if not index_path.exists():
         return []
-    data = json.loads(index_path.read_text())
+    data = json.loads(index_path.read_text(encoding='utf-8'))
     query_embed = embed_texts([query])[0]
     return rank_chunks(query_embed, data)[:top_k]
+
+
+# ── Phase 4: 토픽 기반 벡터 인덱스 ───────────────────────────────────────────
+
+VECTOR_INDEX_FILENAME = "vector_index.json"
+
+_FAST_MODEL = "llama-3.1-8b-instant"
+
+from src._groq import chat_completion, load_env_key
+from src.indexer import embed_texts, cosine_similarity, format_turn
+
+
+def _uniform_boundaries(session: dict, n_topics: int = 5) -> list[int]:
+    """균등 분할 fallback: 사용자 turns를 n_topics 그룹으로 나누는 경계 인덱스 반환.
+
+    입력:
+      session: {"turns": [...], ...}
+      n_topics: 목표 그룹 수 (기본값 5)
+
+    반환:
+      [int, ...] — 경계 turn 인덱스 목록
+      예: 사용자 turn이 [0, 2, 4, 6, 8, 10], n_topics=3 → [4, 8]
+    """
+    turn = session['turns']
+    user_idxs = [i for i, t in enumerate(turn) if t['role'] == 'user']
+    step = max(1, len(user_idxs) // n_topics)
+    boundaries = [user_idxs[step * k] for k in range(1, n_topics) if step * k < len(user_idxs)]
+    return boundaries
+
+def detect_topic_boundaries(session: dict, api_key: str) -> list[int]:
+    """사용자 메시지에서 토픽 경계 인덱스를 탐지한다. (노트북 04-1 섹션 1 참고)
+
+    입력:
+      session: {"turns": [{"role": "user"|"assistant", "blocks": [...]}, ...], ...}
+      api_key: Groq API 키
+
+    반환:
+      [int, ...] — 경계가 되는 turn 인덱스 목록 (0-based, session["turns"] 기준)
+      예: [4, 9]  → turns 0~3 / 4~8 / 9~끝 세 그룹
+
+    Groq 호출 실패 시 _uniform_boundaries(session) fallback.
+    """
+    # 1. [(i, text)] 형태로 사용자 turn 추출
+    # 2. 사용자 turn 1개 이하 → [] 반환
+    # 3. "i: 메시지\n..." 프롬프트 구성
+    # 4. llama-3.1-8b-instant 호출 (max_tokens=300, temperature=0.0)
+    # 5. re.findall(r'\d+', content) → 정수 변환
+    # 6. 유효 범위 필터: 1 이상 len(turns)-1 이하
+    # 7. 예외 → _uniform_boundaries(session)
+    import re
+    try:
+        turns = session['turns']
+        user_msgs = []
+        for i, turn in enumerate(turns):
+            if turn['role'] == 'user':
+                text = " ".join(b['text'] for b in turn['blocks'] if b['type'] == 'text')
+                user_msgs.append((i, text))
+
+        if len(user_msgs) <= 1:
+            return []
+        prompt_input = "\n".join(f"{i}: {text}" for i, text in user_msgs)
+        prompt = f"""아래는 대화에서 사용자가 보낸 메시지 목록입니다 (형식: turn인덱스: 메시지).
+        주제가 크게 바뀌는 경계 직전의 turn 인덱스를 JSON 배열로 반환하세요.
+        경계가 없으면 [] 를 반환하세요.
+        숫자 배열만 출력, 설명 없이.
+
+        {prompt_input}
+
+        경계 인덱스:"""
+
+        content, usage, _ = chat_completion(
+            [{'role': 'user', 'content': prompt}],
+            'llama-3.1-8b-instant', api_key, max_tokens=300, temperature=0.0
+        )
+        nums = re.findall(f'\d+', content)
+        boundaries = [int(n) for n in nums]
+
+        user_idxs_set = set(i for i, _ in user_msgs)
+        boundaries = [b for b in boundaries if 1 <= b <= len(turns) - 1 and b in user_idxs_set]
+        
+        return boundaries
+    except Exception:
+        return _uniform_boundaries(session)
+
+def format_turns_as_text(turns: list[dict]) -> str | None:
+    """turn 목록을 "[사용자]/[AI]" 형식 텍스트로 변환한다.
+    
+    입력:
+      turns: [{"role": "user"|"assistant", "blocks": [...]}, ...]
+    
+    출력:
+      "[사용자]\n질문\n\n---\n\n[AI]\n답변"  또는
+      None (text 블록이 하나도 없는 경우)
+    
+    힌트:
+    - format_turn(turn) 활용 (이미 src/indexer.py에 구현됨)
+    - None 결과는 필터링
+    - "\n\n---\n\n".join(parts)
+    """
+    
+    parts = []
+    for turn in turns:
+        result = format_turn(turn)
+        if result is not None:
+            parts.append(result)
+    if not parts:
+        return None
+    
+    return "\n\n---\n\n".join(parts)
+
+def build_topics(session: dict, boundaries: list[int]) -> list[dict]:
+    """경계 인덱스로 turns를 토픽 그룹으로 묶는다. (노트북 04-1 섹션 2 참고)
+
+    입력:
+      session: {"turns": [...], ...}
+      boundaries: [4, 9]  ← detect_topic_boundaries() 결과
+
+    반환:
+      [
+        {"text": "[사용자]\n...\n\n---\n\n[AI]\n...", "turn_start": 0, "turn_end": 3, "position": 0},
+        {"text": "...", "turn_start": 4, "turn_end": 8, "position": 1},
+        ...
+      ]
+      text가 None인 토픽(text 블록 없는 turns만 있는 경우)은 건너뜀.
+    """
+    # 1. starts = [0] + boundaries, ends = boundaries + [len(turns)]
+    # 2. zip(starts, ends) 로 슬라이싱
+    # 3. format_turn() 으로 각 turn 포맷 → "\n\n---\n\n".join()
+    # 4. text None이면 건너뜀
+    # 5. position은 건너뛰지 않은 토픽 순서 (0부터)
+    turns = session['turns']
+    starts = [0] + boundaries
+    ends = boundaries + [len(turns)]
+
+    topics = []
+    position = 0
+    for s, e in zip(starts, ends):
+        group = turns[s:e]
+        text = format_turns_as_text(group)
+        if text is None:
+            continue
+        topics.append({
+            "text": text,
+            "turn_start": s,
+            "turn_end": e-1,
+            "position": position
+        })
+        position += 1
+
+    return topics
+
+
+def summarize_topic(topic_text: str, api_key: str) -> str:
+    """토픽 텍스트를 Groq로 2~3문장 요약한다. (노트북 04-1 섹션 2 참고)
+
+    입력:
+      topic_text: "[사용자]\nfastembed 설치 방법은?\n\n---\n\n[AI]\npip install fastembed..."
+      api_key: Groq API 키
+
+    반환:
+      "fastembed는 pip install fastembed로 설치하며 ONNX 런타임이 내장되어 있다."
+      Groq 호출 실패 시 topic_text[:200] fallback.
+
+    모델: llama-3.1-8b-instant, max_tokens=250, temperature=0.0
+    원칙: 고유명사, 경로, 설정값은 원문 그대로 포함.
+    """
+    # 1. 요약 프롬프트 구성 (topic_text[:4000] 사용)
+    # 2. chat_completion 호출
+    # 3. 응답 content 반환
+    # 4. 예외 → topic_text[:200]
+    summary_prompt = f"""다음 대화를 핵심 정보만 포함해 2~3문장으로 요약하세요.
+    고유명사, 경로, 설정값, 에러명은 원문 그대로 포함하세요.
+
+    {topic_text[:4000]}
+
+    요약:"""
+    try:
+
+      content, usage, _ = chat_completion(
+        [{'role': 'user', 'content': summary_prompt}],
+        'llama-3.1-8b-instant', api_key, max_tokens=250, temperature=0.0
+      )
+      return content
+
+    except Exception:
+        return topic_text[:200]
+
+
+def build_vector_index(session: dict, session_dir: Path, api_key: str) -> Path:
+    """토픽 기반 인덱스를 빌드해 vector_index.json으로 저장한다. (노트북 04-1 섹션 3 참고)
+
+    입력:
+      session: {"session_id": str, "turns": [...], ...}
+      session_dir: 인덱스를 저장할 디렉토리 (없으면 생성)
+      api_key: Groq API 키
+
+    저장 경로: session_dir / "vector_index.json"
+    저장 형식:
+      [
+        {
+          "text":       "[사용자]\n...",   # 원문 (LLM에 전달)
+          "summary":    "핵심 2~3문장",   # 임베딩 대상
+          "embedding":  [0.12, ...],      # 1024차원
+          "position":   0,
+          "turn_start": 0,
+          "turn_end":   3
+        },
+        ...
+      ]
+    이미 존재하면 재계산 없이 경로만 반환.
+    """
+    # 1. index_path = session_dir / VECTOR_INDEX_FILENAME
+    # 2. exists() → 바로 반환
+    # 3. mkdir(parents=True, exist_ok=True)
+    # 4. detect_topic_boundaries() → boundaries
+    # 5. build_topics() → topics
+    # 6. 각 topic: summarize_topic() → summary
+    # 7. embed_texts([요약 목록]) → embeddings (list로 변환)
+    # 8. 각 topic에 summary, embedding 추가
+    # 9. json 저장
+    index_path = session_dir / "vector_index.json"
+
+    if index_path.exists():
+        return index_path
+    
+    session_dir.mkdir(parents=True, exist_ok=True)
+    boundaries = detect_topic_boundaries(session, api_key)
+    topics = build_topics(session, boundaries)
+    summaries = [summarize_topic(t['text'], api_key) for t in topics]
+    embeddings = embed_texts(summaries)
+    for i, topic in enumerate(topics):
+        topic['summary'] = summaries[i]
+        topic['embedding'] = list(embeddings[i])
+    index_path.write_text(json.dumps(topics, ensure_ascii=False), encoding='utf-8')
+    return index_path
+
+
+def search_vector(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
+    """벡터 인덱스에서 코사인 유사도로 상위 top_k 토픽을 검색한다. (노트북 04-1 섹션 3 참고)
+
+    입력:
+      query: "ONNX 런타임 자동 설치 여부"
+      index_path: session_dir / "vector_index.json"
+      top_k: 반환할 최대 개수
+
+    반환:
+      [
+        {
+          "text":       "[사용자]\n...",   # 원문
+          "summary":    "핵심 2~3문장",
+          "score":      0.87,             # 코사인 유사도
+          "position":   0,
+          "turn_start": 0,
+          "turn_end":   3
+        },
+        ...
+      ]
+      유사도 내림차순 정렬. 인덱스 파일 없으면 [] 반환.
+    """
+    # search() 와 동일 패턴, embedding 필드는 공유
+    if not index_path.exists():
+        return []
+    data = json.loads(index_path.read_text(encoding='utf-8'))
+    query_vec = list(embed_texts([query])[0])
+    for item in data:
+        item['score'] = cosine_similarity(query_vec, item['embedding'])
+    return sorted(data, key=lambda x: x['score'], reverse=True)[:top_k]
+
+
+# ── Phase 4: 쿼리 분류 ────────────────────────────────────────────────────────
+
+import re
+_RETRIEVAL_PATTERN = re.compile(r'\d|\.\w{2,4}\b|[/\\]')
+
+def should_be_retrieval(question: str) -> bool:
+    """구체적 수치/파일명/경로 포함 여부로 retrieval 강제 여부를 반환한다.
+
+    입력:
+      question: 분류할 질문 문자열
+    출력:
+      True  → retrieval 강제 (LLM 분류 생략)
+      False → LLM 분류 진행
+
+    True 조건 (하나라도 해당 시):
+    - 숫자 포함:      re.search(r'\\d', question)
+    - 파일 확장자:    re.search(r'\\.\\w{2,4}\\b', question)  (.py .json .js .md 등)
+    - 경로 포함:      '/' in question or '\\\\' in question
+    """
+    return bool(_RETRIEVAL_PATTERN.search(question))
+
+def classify_query(question: str, api_key: str, model: str = 'llama-3.1-8b-instant') -> str:
+    """질문을 simple / analytical / retrieval 로 분류한다. (노트북 04-2 섹션 1 참고)
+
+    입력:
+      question: "chunk_size 기본값이 얼마야?"
+      api_key: Groq API 키
+      model: 분류에 쓸 모델 (설정 패널에서 선택 가능, 기본 llama-3.1-8b-instant)
+
+    반환:
+      "simple"     — 세션 없이 LLM이 알 수 있는 일반 지식
+      "analytical" — 대화 흐름 파악 필요, 구체적 수치/파일명 불필요
+      "retrieval"  — 특정 수치, 파일명, 에러명, 결정 사항 필요
+
+    원칙: 숫자/파일명/.py/.json 포함 시 retrieval 강제.
+          Groq 호출 실패 시 "retrieval" 반환 (안전한 폴백).
+    """
+    # 1. 숫자/경로/파일 확장자 패턴 → retrieval 강제
+    # 2. 분류 프롬프트 구성
+    # 3. llama-3.1-8b-instant 호출 (max_tokens=20, temperature=0.0)
+    # 4. 응답 파싱: {"simple","analytical","retrieval"} 검증
+    # 5. 예외 → "retrieval"
+    if should_be_retrieval(question):
+        return "retrieval"
+    
+    prompt = f"""다음 질문을 아래 세 가지 중 하나로 분류하세요.
+    
+    - simple: 이 대화 세션 없이도 LLM이 알고 있는 일반 지식
+    - analytical: 대화 전체 흐름 파악 필요, 구체적 수치/파일명 불필요
+    - retrieval: 특정 수치, 파일명, 에러명, 결정 사항 등 구체적 사실 필요
+
+    중요: 모호하면 retrieval로 답하세요.
+    단어 하나만 출력하세요: simple 또는 analytical 또는 retrieval
+
+    질문: {question}
+    분류:"""
+
+    try:
+        content, usage, _ = chat_completion(
+            [{'role': 'user', 'content': prompt}],
+            model, api_key, max_tokens=20, temperature=0.0
+        )
+        answer = content.strip().lower().split()[0]
+
+    except Exception:
+        return 'retrieval'
+    return answer if answer in {'simple', 'analytical', 'retrieval'} else 'retrieval'
+
+
+def build_analytical_context(topics: list[dict]) -> str:
+    """토픽 요약 목록으로 analytical 경로의 system 프롬프트를 만든다.
+
+    입력:
+      topics: [{"position": int, "summary": str, ...}, ...]
+    출력:
+      "아래는 이 대화 세션의 주요 주제 요약입니다.\n1. ...\n2. ...\n이 요약을 바탕으로 답변하세요."
+
+    힌트:
+    - lines = ["아래는 이 대화 세션의 주요 주제 요약입니다.\n"]
+    - 각 topic의 position+1 번호와 summary 추가
+    - lines.append("\n이 요약을 바탕으로 답변하세요.")
+    - "\n".join(lines)
+    """
+    lines = ['아래는 이 대화 세션의 주요 주제 요약입니다.\n']
+    for t in topics:
+        lines.append(f"{t['position'] + 1}. {t['summary']}")
+    lines.append('\n이 요약을 바탕으로 답변하세요.')
+    return '\n'.join(lines)
+
+
+def build_retrieval_context(search_results: list[dict]) -> str:
+    """검색된 토픽 원문으로 retrieval 경로의 system 프롬프트를 만든다.
+
+    입력:
+      search_results: [{"text": str, "summary": str, "score": float, ...}, ...]
+    출력:
+      "아래는 관련 대화 내용입니다. 이 내용을 근거로 답변하세요.\n\n---\n\n[사용자]\n..."
+
+    힌트:
+    - parts = ["아래는 관련 대화 내용입니다. 이 내용을 근거로 답변하세요.\n"]
+    - 각 result의 "text" 추가
+    - "\n\n---\n\n".join(parts)
+    """
+    parts = ['아래는 관련 대화 내용입니다. 이 내용을 근거로 답변하세요. \n']
+    for r in search_results:
+        parts.append(r['text'])
+    return '\n\n---\n\n'.join(parts)
+
+
+def route_query(
+    question: str,
+    topics: list[dict],
+    index_path: Path,
+    api_key: str,
+    top_k: int = 3,
+    routing_model: str = 'llama-3.1-8b-instant',
+    forced_type: str | None = None,
+) -> dict:
+    """질문을 분류하고 유형별 컨텍스트를 구성한다.
+
+    입력:
+      question:      분류할 질문
+      topics:        [{"position": int, "summary": str, ...}, ...]
+      index_path:    vector_index.json 경로
+      api_key:       Groq API 키
+      top_k:         retrieval 경로에서 가져올 토픽 수
+      routing_model: classify_query에 쓸 모델 (설정 패널에서 선택 가능)
+      forced_type:   "simple"|"analytical"|"retrieval" 중 하나면 분류 생략하고 그대로 사용
+                      (설정 패널에서 라우팅을 수동 고정한 경우)
+    출력:
+      {
+        "query_type":     "simple" | "analytical" | "retrieval",
+        "system":         str,
+        "search_results": list[dict]   ← retrieval일 때만 채워짐, 나머지 []
+      }
+
+    구현 순서:
+    1. forced_type이 유효한 값이면 그대로 query_type으로 사용, 아니면 classify_query(question, api_key, routing_model) → query_type
+    2. "simple"     → system = "당신은 도움이 되는 AI 어시스턴트입니다.", search_results = []
+    3. "analytical" → system = build_analytical_context(topics),       search_results = []
+    4. "retrieval"  → search_results = search_vector(question, index_path, top_k)
+                       system = build_retrieval_context(search_results)
+    5. return {"query_type": query_type, "system": system, "search_results": search_results}
+    """
+    if forced_type in ('simple', 'analytical', 'retrieval'):
+        query_type = forced_type
+    else:
+        query_type = classify_query(question, api_key, routing_model)
+
+    if query_type == 'simple':
+        system = '당신은 도움이 되는 AI 어시스턴트입니다.'
+        search_results = []
+
+    elif query_type == 'analytical':
+        system = build_analytical_context(topics)
+        search_results = []
+    else:
+        search_results = search_vector(question, index_path, top_k)
+        system = build_retrieval_context(search_results)
+    
+    return {
+        'query_type' : query_type,
+        'system' : system,
+        'search_results': search_results,
+    }

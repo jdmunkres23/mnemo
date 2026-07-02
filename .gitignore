@@ -11,6 +11,8 @@ data/
 raw_data/*
 !raw_data/.gitkeep
 
+_preview_collapsed.png
+
 .venv/
 __pycache__/
 *.egg-info/
@@ -21,3 +23,5 @@ docs/progress.md
 docs/different.md
 
 /eval_data/test/**
+
+usage/

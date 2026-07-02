@@ -272,15 +272,45 @@ textarea::placeholder{color:var(--text3)}
 .ai-panel-title{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap}
 .ai-session-label{font-size:12px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* 설정 패널 */
-.ai-settings{padding:12px 14px;border-bottom:1px solid var(--border);background:#faf9f7;flex-shrink:0}
+/* ── 설정 패널 (AI 채팅 패널 오른쪽에 별도로 열림) ── */
+.ai-settings-panel{
+  width:280px;flex-shrink:0;
+  background:var(--bg);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;height:100vh;
+  transition:width var(--tr),opacity var(--tr);
+  overflow:hidden;
+}
+.ai-settings-panel.hidden{width:0;opacity:0;border-left:none;pointer-events:none}
+
+/* AI 채팅 툴바의 라우팅 모드 퀵 선택 */
+.ai-routing-mode-quick{font-size:11px;font-family:var(--font);color:var(--text2);background:transparent;border:1px solid var(--border2);border-radius:14px;padding:3px 6px;outline:none;cursor:pointer;max-width:100px}
+
+/* 설정 뷰 */
+.ai-settings-view{flex:1;display:flex;flex-direction:column;overflow-y:auto;padding:14px}
+.ai-settings-view::-webkit-scrollbar{width:3px}
+.ai-settings-view::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.settings-section{margin-bottom:16px}
+.settings-section-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.settings-usage-reset{font-size:11px;font-weight:400;color:var(--text3)}
 .settings-field{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
 .settings-label{font-size:11px;font-weight:500;color:var(--text2)}
 .settings-input{font-size:13px;font-family:var(--font);padding:6px 8px;border:1px solid var(--border2);border-radius:7px;background:var(--bg);color:var(--text);outline:none;width:100%}
 .settings-input:focus{border-color:rgba(0,0,0,.25)}
 .settings-hint{display:block;font-size:11px;color:var(--text3);margin-top:3px}
-.settings-save-btn{padding:5px 12px;border-radius:7px;border:none;background:var(--send);color:#fff;font-size:12px;font-family:var(--font);cursor:pointer;font-weight:500}
+.settings-save-btn{padding:6px 12px;border-radius:7px;border:none;background:var(--send);color:#fff;font-size:12px;font-family:var(--font);cursor:pointer;font-weight:500;margin-bottom:18px;align-self:flex-start}
 .settings-save-btn:hover{opacity:.88}
+
+/* 사용량 */
+.ai-usage-list{display:flex;flex-direction:column;gap:10px}
+.ai-usage-empty{font-size:12px;color:var(--text3);padding:6px 0}
+.ai-usage-row-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px}
+.ai-usage-name{font-size:12px;color:var(--text);font-weight:500}
+.ai-usage-nums{font-size:11px;color:var(--text3)}
+.ai-usage-bar{height:5px;border-radius:3px;background:var(--border2);overflow:hidden}
+.ai-usage-bar-fill{height:100%;background:#7fb37f;border-radius:3px;transition:width .2s}
+.ai-usage-bar-fill.warn{background:#d9a441}
+.ai-usage-bar-fill.danger{background:#c96a5a}
+.ai-usage-remaining{font-size:10px;color:var(--text3);margin-top:2px}
 
 /* 채팅 뷰 래퍼 */
 .ai-chat-view{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
@@ -330,6 +360,19 @@ textarea::placeholder{color:var(--text3)}
 .ai-bubble.ai li{margin:3px 0}
 .ai-bubble.ai h1,.ai-bubble.ai h2,.ai-bubble.ai h3{font-size:14px;font-weight:600;margin:8px 0 4px}
 .ai-bubble.ai strong{font-weight:600}
+
+.ai-msg-col{display:flex;flex-direction:column;max-width:90%}
+.ai-source-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.ai-source-label{font-size:11px;color:var(--text3)}
+.ai-source-chip{font-size:11px;color:var(--text2);background:transparent;border:1px solid var(--border2);border-radius:12px;padding:2px 9px;cursor:pointer;font-family:var(--font);transition:background .1s,opacity .1s}
+.ai-source-chip:hover{background:var(--hover);opacity:1 !important}
+
+/* AI 채팅 출처 칩 클릭 시 대화 뷰어에서 잠깐 강조 */
+.turn-highlight{animation:turn-flash 1.6s ease}
+@keyframes turn-flash{
+  0%{background:rgba(255,196,0,.25)}
+  100%{background:transparent}
+}
 
 /* 로딩 스피너 (점 세 개) */
 .ai-thinking{display:flex;align-items:center;gap:4px;padding:6px 2px;flex-shrink:0}

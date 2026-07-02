@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 import os
+from src import usage_tracker
 
 _CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 _MODELS_URL = "https://api.groq.com/openai/v1/models"
@@ -90,14 +91,17 @@ def chat_completion(
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
                 rate_limit_dict = {
+                    "limit_tokens":       resp.headers.get("x-ratelimit-limit-tokens", ""),
                     "remaining_requests": resp.headers.get("x-ratelimit-remaining-requests", ""),
-                    "remaining_tokens": resp.headers.get("x-ratelimit-remaining-tokens", ""),
-                    "reset_requests": resp.headers.get("x-ratelimit-reset-requests", ""),
-                    "reset_tokens": resp.headers.get("x-ratelimit-reset-tokens", "")
+                    "remaining_tokens":   resp.headers.get("x-ratelimit-remaining-tokens", ""),
+                    "reset_requests":     resp.headers.get("x-ratelimit-reset-requests", ""),
+                    "reset_tokens":       resp.headers.get("x-ratelimit-reset-tokens", "")
                 }
                 body = json.loads(resp.read().decode("utf-8"))
                 content = body['choices'][0]['message']['content']
                 usage = body['usage']
+                usage_tracker.record(model, usage)
+                usage_tracker.throttle_if_needed(rate_limit_dict)
                 return (content, usage, rate_limit_dict)
 
         except urllib.error.HTTPError as exc:

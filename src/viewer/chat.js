@@ -2,7 +2,7 @@
 let aiState = {
   sessionId: null,
   chatId: null,
-  messages: [],          // { role, content }
+  messages: [],          // { role, content, meta?: { query_type, search_results } }
   sessionTitle: '',
   loading: false,
 };
@@ -32,7 +32,9 @@ const MODEL_META = {
 
 let _serverHasKey = false;
 let _historyViewOpen = false;
+let _settingsViewOpen = false;
 let _cachedChats = [];
+let _lastFetchedModels = FALLBACK_MODELS;
 
 // ── 초기화 ──
 function initAIChat(sessionId) {
@@ -95,11 +97,13 @@ async function _fetchModels() {
     const res = await fetch(url);
     const data = await res.json();
     if (data.models && data.models.length) {
+      _lastFetchedModels = data.models;
       _buildModelDropdown(data.models);
       return;
     }
   } catch (e) {}
 
+  _lastFetchedModels = FALLBACK_MODELS;
   _buildModelDropdown(FALLBACK_MODELS);
 }
 
@@ -250,19 +254,97 @@ async function openHistChat(chatId) {
   _setHistoryView(false);
 }
 
-// ── 설정 패널 토글 ──
+// ── 설정 패널 토글 (AI 채팅 패널 오른쪽에 별도로 열리는 독립 패널) ──
 function toggleAISettings() {
-  const panel = document.getElementById('aiSettings');
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  panel.style.display = isOpen ? 'none' : 'block';
-  if (!isOpen) {
-    const inp = document.getElementById('groqApiKeyInput');
-    if (inp) inp.value = loadApiKey();
+  _setSettingsView(!_settingsViewOpen);
+}
+
+function _setSettingsView(open) {
+  _settingsViewOpen = open;
+  const panel  = document.getElementById('aiSettingsPanel');
+  const setBtn = document.getElementById('aiSettingsBtn');
+  if (panel)  panel.classList.toggle('hidden', !open);
+  if (setBtn) setBtn.classList.toggle('active', open);
+  if (open) _openSettingsView();
+}
+
+async function _openSettingsView() {
+  const inp = document.getElementById('groqApiKeyInput');
+  if (inp) inp.value = loadApiKey();
+
+  _populateSettingsModelSelects();
+
+  const modeSel = document.getElementById('aiRoutingModeSel');
+  if (modeSel) modeSel.value = _getRoutingMode();
+
+  await _loadUsageStatus();
+}
+
+function _populateSettingsModelSelects() {
+  const models = (_lastFetchedModels && _lastFetchedModels.length) ? _lastFetchedModels : FALLBACK_MODELS;
+  const optionsHtml = models.map(m => {
+    const meta = MODEL_META[m.id] || {};
+    return `<option value="${m.id}">${escHtml(meta.label || m.id)}</option>`;
+  }).join('');
+
+  const answerSel = document.getElementById('aiModelSelSettings');
+  if (answerSel) {
+    answerSel.innerHTML = optionsHtml;
+    answerSel.value = _getModel();
+  }
+  const routingSel = document.getElementById('aiRoutingModelSel');
+  if (routingSel) {
+    routingSel.innerHTML = optionsHtml;
+    routingSel.value = _getRoutingModel();
   }
 }
 
-// ── API 키 저장/로드 ──
+// ── 사용량 ──
+async function _loadUsageStatus() {
+  const resetEl = document.getElementById('aiUsageReset');
+  const listEl  = document.getElementById('aiUsageList');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="ai-usage-empty">불러오는 중...</div>';
+
+  try {
+    const res = await fetch('/api/usage-status');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    if (resetEl) resetEl.textContent = `리셋까지 ${_fmtDuration(data.reset_seconds)}`;
+
+    const used = (data.models || []).filter(m => m.used > 0);
+    if (!used.length) {
+      listEl.innerHTML = '<div class="ai-usage-empty">오늘 사용 기록 없음</div>';
+      return;
+    }
+    used.sort((a, b) => b.pct - a.pct);
+
+    listEl.innerHTML = used.map(m => {
+      const barClass = m.pct >= 90 ? ' danger' : m.pct >= 60 ? ' warn' : '';
+      const label = (MODEL_META[m.model] || {}).label || m.model;
+      return `<div class="ai-usage-row">
+  <div class="ai-usage-row-top">
+    <span class="ai-usage-name">${escHtml(label)}</span>
+    <span class="ai-usage-nums">${m.used.toLocaleString()} / ${m.limit.toLocaleString()} (${m.pct}%)</span>
+  </div>
+  <div class="ai-usage-bar"><div class="ai-usage-bar-fill${barClass}" style="width:${Math.min(100, m.pct)}%"></div></div>
+  <div class="ai-usage-remaining">남은 ${m.remaining.toLocaleString()}</div>
+</div>`;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div class="ai-usage-empty">사용량을 불러오지 못했습니다</div>';
+  }
+}
+
+function _fmtDuration(seconds) {
+  if (!seconds || seconds <= 0) return '곧';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
+}
+
+// ── API 키 저장 (모델/라우팅 선택은 바로 적용되므로 버튼 없이 change로 처리) ──
 function saveApiKey() {
   const inp = document.getElementById('groqApiKeyInput');
   const key = inp ? inp.value.trim() : '';
@@ -270,11 +352,33 @@ function saveApiKey() {
     localStorage.setItem('groq_api_key', key);
     _showToast('API 키가 저장됐습니다');
   }
-  toggleAISettings();
 }
 
 function loadApiKey() {
   return localStorage.getItem('groq_api_key') || '';
+}
+
+function _getRoutingModel() {
+  return localStorage.getItem('groq_routing_model') || 'llama-3.1-8b-instant';
+}
+
+function _setRoutingModel(modelId) {
+  localStorage.setItem('groq_routing_model', modelId);
+  const sel = document.getElementById('aiRoutingModelSel');
+  if (sel) sel.value = modelId;
+}
+
+function _getRoutingMode() {
+  return localStorage.getItem('groq_routing_mode') || 'auto';
+}
+
+// 설정 패널의 셀렉트, AI 채팅 툴바의 퀵 셀렉트 둘 다 동일한 값을 갖도록 동기화
+function _setRoutingMode(mode) {
+  localStorage.setItem('groq_routing_mode', mode);
+  const quick = document.getElementById('aiRoutingModeQuick');
+  const full  = document.getElementById('aiRoutingModeSel');
+  if (quick) quick.value = mode;
+  if (full)  full.value = mode;
 }
 
 function _getModel() {
@@ -310,12 +414,11 @@ async function sendAIMessage() {
   _setThinking(true);
 
   try {
-    const context = await _getRagContext(aiState.sessionId, text);
-    const systemPrompt = `아래는 관련 대화 내용입니다. 이 내용을 근거로 질문에 답하세요.\n\n${context}`;
+    const routing = await _getRagContext(aiState.sessionId, text);
 
     const groqMessages = [
-      { role: 'system', content: systemPrompt },
-      ...aiState.messages,
+      { role: 'system', content: routing.system },
+      ...aiState.messages.map(m => ({ role: m.role, content: m.content })),
     ];
 
     const res = await fetch('/api/groq-proxy', {
@@ -335,7 +438,11 @@ async function sendAIMessage() {
       throw new Error(data.error || `HTTP ${res.status}`);
     }
 
-    aiState.messages.push({ role: 'assistant', content: data.content });
+    aiState.messages.push({
+      role: 'assistant',
+      content: data.content,
+      meta: { query_type: routing.query_type, search_results: routing.search_results },
+    });
     _updateRateBadge(data.rate_limit, data.usage);
     await _saveChatHistory();
 
@@ -349,7 +456,7 @@ async function sendAIMessage() {
   }
 }
 
-// ── RAG: 인덱싱 후 벡터 검색으로 관련 청크 반환 ──
+// ── RAG: 인덱싱 후 쿼리 라우팅 결과(system 프롬프트 + 출처 메타) 반환 ──
 async function _getRagContext(sessionId, query) {
   // 1. 인덱싱 (이미 돼 있으면 서버에서 재사용)
   await fetch('/api/index-session', {
@@ -358,18 +465,27 @@ async function _getRagContext(sessionId, query) {
     body: JSON.stringify({ session_id: sessionId }),
   });
 
-  // 2. 벡터 검색
+  // 2. 쿼리 라우팅 + 벡터 검색 (simple/analytical/retrieval에 따라 system이 서버에서 조립됨)
+  const mode = _getRoutingMode();
   const res = await fetch('/api/query-semantic', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session_id: sessionId, query, top_k: 3 }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      query,
+      top_k: 3,
+      api_key: loadApiKey(),
+      routing_model: _getRoutingModel(),
+      forced_type: mode === 'auto' ? null : mode,
+    }),
   });
-  if (!res.ok) throw new Error('벡터 검색 실패');
+  if (!res.ok) throw new Error('검색 실패');
   const data = await res.json();
-
-  const chunks = Array.isArray(data) ? data : (data.results || []);
-  if (chunks.length === 0) return '관련 내용을 찾지 못했습니다.';
-  return chunks.map(c => c.text).join('\n\n---\n\n');
+  return {
+    system: data.system || '당신은 도움이 되는 AI 어시스턴트입니다.',
+    query_type: data.query_type || 'simple',
+    search_results: data.search_results || [],
+  };
 }
 
 // ── 채팅 기록 ──
@@ -466,12 +582,47 @@ function _renderAIMessages() {
     div.className = `ai-bubble-row ${msg.role === 'user' ? 'user' : 'ai'}`;
     const html = msg.role === 'user'
       ? `<div class="ai-bubble user">${escHtml(msg.content).replace(/\n/g, '<br>')}</div>`
-      : `<div class="ai-bubble ai">${renderMarkdown(msg.content)}</div>`;
+      : `<div class="ai-msg-col"><div class="ai-bubble ai">${renderMarkdown(msg.content)}</div>${_renderSourceChips(msg.meta)}</div>`;
     div.innerHTML = html;
     list.appendChild(div);
   });
 
   list.scrollTop = list.scrollHeight;
+}
+
+// AI 답변 아래 출처 표시: retrieval이면 턴 범위 칩(클릭 시 대화 뷰어로 스크롤), 아니면 안내 텍스트
+function _renderSourceChips(meta) {
+  if (!meta) return '';
+
+  if (meta.query_type === 'simple') {
+    return `<div class="ai-source-row"><span class="ai-source-label">출처: 세션 데이터 미사용</span></div>`;
+  }
+  if (meta.query_type === 'analytical') {
+    return `<div class="ai-source-row"><span class="ai-source-label">출처: 전체 토픽 요약 기반</span></div>`;
+  }
+
+  const results = meta.search_results || [];
+  if (!results.length) {
+    return `<div class="ai-source-row"><span class="ai-source-label">출처: 관련 내용을 찾지 못함</span></div>`;
+  }
+
+  // 유사도 내림차순 정렬 — 점수는 그대로 텍스트로 보여주되, 결과 내 상대적 유사도에 따라
+  // 진하기(불투명도)를 다르게 줘서 가장 관련 있는 걸 시각적으로 바로 구분되게 함
+  const sorted = [...results].sort((a, b) => (b.score || 0) - (a.score || 0));
+  const scores = sorted.map(r => r.score || 0);
+  const maxScore = Math.max(...scores);
+  const minScore = Math.min(...scores);
+  const range = maxScore - minScore || 1;
+
+  const chips = sorted.map(r => {
+    const label = r.turn_start === r.turn_end ? `turn ${r.turn_start}` : `turn ${r.turn_start}-${r.turn_end}`;
+    const score = typeof r.score === 'number' ? ` · ${r.score.toFixed(2)}` : '';
+    const tip = escHtml((r.summary || '').slice(0, 120));
+    const norm = typeof r.score === 'number' ? (r.score - minScore) / range : 1;
+    const opacity = (0.5 + norm * 0.5).toFixed(2); // 결과 중 최저 0.5 ~ 최고 1.0
+    return `<button class="ai-source-chip" style="opacity:${opacity}" onclick="scrollToTurn(${r.turn_start})" title="${tip}">${label}${score}</button>`;
+  }).join('');
+  return `<div class="ai-source-row">${chips}</div>`;
 }
 
 function _appendAISystemMsg(text) {
@@ -556,6 +707,21 @@ function _bindAIChatInput() {
 
   const modelBtn = document.getElementById('aiModelBtn');
   if (modelBtn) modelBtn.addEventListener('click', toggleModelDropdown);
+
+  const answerModelSel = document.getElementById('aiModelSelSettings');
+  if (answerModelSel) answerModelSel.addEventListener('change', () => selectAIModel(answerModelSel.value));
+
+  const routingModelSel = document.getElementById('aiRoutingModelSel');
+  if (routingModelSel) routingModelSel.addEventListener('change', () => _setRoutingModel(routingModelSel.value));
+
+  const routingModeSel = document.getElementById('aiRoutingModeSel');
+  if (routingModeSel) routingModeSel.addEventListener('change', () => _setRoutingMode(routingModeSel.value));
+
+  const routingModeQuick = document.getElementById('aiRoutingModeQuick');
+  if (routingModeQuick) {
+    routingModeQuick.value = _getRoutingMode();
+    routingModeQuick.addEventListener('change', () => _setRoutingMode(routingModeQuick.value));
+  }
 
   // 패널 첫 로드: 서버 키 확인 + 모델 목록 가져오기
   _initAIChatPanel();
