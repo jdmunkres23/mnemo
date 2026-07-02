@@ -433,6 +433,8 @@ def main() -> None:
                     help="기존 판정 JSON으로 채점만 재실행")
     ap.add_argument("--output", type=Path, default=None, metavar="PATH",
                     help="결과 JSON 저장 경로")
+    ap.add_argument("--top-k", type=int, default=3, metavar="N",
+                    help="검색할 토픽/청크 수 (기본값: 3)")
     args = ap.parse_args()
 
     # TODO: 구현
@@ -492,9 +494,9 @@ def main() -> None:
     # 4. modes 루프
     for mode in modes:
         if mode == "baseline":
-            results = run_baseline(qa_pairs, session, session_dir, api_key)
+            results = run_baseline(qa_pairs, session, session_dir, api_key, top_k=args.top_k)
         elif mode == "vector":
-            results = run_vector(qa_pairs, session, session_dir, api_key)
+            results = run_vector(qa_pairs, session, session_dir, api_key, top_k=args.top_k)
         else:
             print(f"아직 구현되지 않은 모드: {mode}")
             continue
