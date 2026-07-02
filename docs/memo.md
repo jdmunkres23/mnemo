@@ -396,3 +396,42 @@ baseline이 Hit Rate·keyfact 모두 근소 우위지만:
 3. vector의 약점(multihop + 경계 인접 single-hop)이 정확히 인접 게이팅이 겨냥하는 문제와 일치.
 
 위 근거로 **인접 게이팅을 구현 후 재평가**하기로 결정. 인접 게이팅 적용 후에도 baseline 대비 개선(Correctness +0.3 기준)이 없으면 vector 경로 자체를 재검토.
+
+---
+
+## AI 채팅 실사용 점검 (Phase 4 쿼리 라우팅 실전 투입)
+
+evaluator.py 평가와 별개로, 실제 `python -m viewer` 채팅 기능을 처음으로 제대로 점검함. Phase 4 문서에 설계된 쿼리 라우팅(`route_query`)이 여태 실제 채팅에 제대로 연결된 적이 없었다는 게 드러남.
+
+### 버그 1 — 채팅 RAG 컨텍스트가 사실상 항상 비어 있었음
+
+`chat.js`의 `_getRagContext()`가 `/api/query-semantic` 응답에서 `data.results`를 읽고 있었는데, 서버(`route_query()`)가 실제로 주는 필드는 `search_results`. 이름이 안 맞아서 매번 빈 배열로 처리되고, AI한테는 "관련 내용을 찾지 못했습니다"만 전달되고 있었음 — **즉 AI 채팅이 세션 내용을 사실상 전혀 참고하지 못하는 상태로 배포돼 있었음.** `system` 필드(서버가 이미 simple/analytical/retrieval에 맞게 조립해준 프롬프트)도 안 쓰고 프론트에서 따로 만들고 있었음. → `system`을 그대로 쓰도록 수정.
+
+### 기능 — 답변 출처 표시
+
+같은 김에 각 AI 답변 아래 출처를 보여주는 기능 추가:
+- `route_query()`의 `query_type`/`search_results`를 메시지에 `meta`로 저장 (채팅 기록 저장/복원 시에도 그대로 유지됨, 서버가 `messages`를 그대로 저장하는 구조라 별도 스키마 변경 불필요)
+- retrieval이면 턴 범위 칩 표시, 클릭 시 대화 뷰어가 해당 턴으로 스크롤+하이라이트 (`app.js`에 `data-turn-index` 추가, `scrollToTurn()`)
+- 칩은 결과 내 상대적 유사도에 따라 불투명도 차등(진하게=관련도 높음)
+- **주의**: `meta`를 `aiState.messages`에서 그대로 Groq 요청에 스프레드하면 Groq가 "메시지에 알 수 없는 속성"이라며 거부함 → 요청 조립 시 `{role, content}`만 뽑아서 보내도록 별도 처리 필요했음.
+
+### 발견 — 쿼리 라우팅이 retrieval 쪽으로 과도하게 편향됨
+
+실사용 중 두 가지 오분류 확인:
+1. **"1+1은 뭐야"** → `should_be_retrieval()`의 정규식(`\d`)이 숫자만 보고 분류 모델 호출도 없이 무조건 retrieval 강제. 세션과 무관한 산수 질문에도 토픽 원문을 통째로 컨텍스트에 넣어 토큰 낭비.
+2. **"LLM이 뭐야"** (통신사/eSIM 대화 세션에서) → 숫자·경로 없어 정규식은 안 걸렸지만, `classify_query()` 프롬프트의 "모호하면 retrieval로 답하세요" 지시 때문에 8b 분류 모델이 retrieval로 오분류. 세션과 무관한 일반 지식 질문인데도 관련 없는 턴이 컨텍스트로 들어감.
+
+Phase 4 설계 문서에도 "쿼리 라우팅 평가는 Phase 4에서 제외 — 정확도 평가는 나중에"라고 이미 적혀 있던 부분이라, 실제로 한 번도 측정 안 된 상태에서 이번에 구멍이 드러난 것. **아직 라우팅 로직 자체(정규식/프롬프트)는 안 고쳤음** — 대신 아래 설정 기능으로 사용자가 수동 우회할 수 있게만 해둠. classify_query 정확도를 재는 전용 QA 세트 설계는 미착수.
+
+### 기능 — 설정 패널 확장 (AI 채팅 패널 오른쪽에 별도 패널로)
+
+- **사용량 표시**: `usage_tracker.py`에 `get_status()` 추가(CLI `__main__`도 재사용하도록 정리), `GET /api/usage-status` 신설. 설정 패널에 모델별 막대그래프 + 사용/한도/남은 토큰 + 리셋까지 남은 시간 표시.
+  - 주의: 로컬 `usage/*.jsonl`은 **성공한 호출만** 기록하므로, Groq 서버 쪽 실제 집계(거부된 요청도 카운트될 수 있음)와 다를 수 있음. 참고용 수치.
+- **답변 모델 / 쿼리 라우팅 모델 분리 선택**: `classify_query()`가 `llama-3.1-8b-instant`로 고정돼 있던 걸 파라미터화, 설정 패널에서 둘을 독립적으로 고를 수 있게 함.
+- **라우팅 모드 수동 고정**: `route_query()`에 `forced_type` 파라미터 추가 — `auto`/`simple`/`analytical`/`retrieval` 중 고르면 분류 모델 호출 자체를 생략하고 지정한 경로만 사용. 설정 패널과 AI 채팅 툴바 양쪽에 동일한 컨트롤을 두고 서로 동기화.
+- UI: 설정을 채팅 패널 안에서 뷰 전환하던 기존 방식 대신, `사이드바 | 대화뷰어 | AI채팅 | 설정` 형태로 **완전히 별도 패널**로 분리 (채팅 보면서 설정 동시에 열어둘 수 있음).
+
+### 남은 것 (메모만, 착수 안 함)
+
+- **RAG 모드(baseline/vector)를 채팅에서 선택 가능하게 하는 건 보류.** 지금 채팅은 벡터 검색(`build_vector_index`+`search_vector`)로 하드코딩돼 있고 baseline 경로(`build_index`+`search`)는 evaluator.py 평가에서만 쓰임. 채팅에 붙이려면 `analytical` 모드가 문제 — baseline 인덱스(고정 청크)는 애초에 토픽 요약이 없어서 analytical과 호환이 안 됨. baseline 선택 시 analytical을 숨기거나 vector 인덱스로 강제 폴백하는 결정이 필요 → 나중에 설계 확정 후 진행.
+- classify_query 라우팅 정확도 자체 개선(정규식 완화, "모호하면 retrieval" 프롬프트 재검토, 또는 전용 평가 QA 세트로 측정) — 원인은 파악됐지만 로직 수정은 아직.

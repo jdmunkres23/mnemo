@@ -272,13 +272,14 @@ session_index.json에 propositions[] 배열로 추가 저장 (topics[] 병존)
 | `retrieval` | 전체 RAG + KG 파이프라인 | "어떤 파일 수정했어?" |
 
 ```
-질문 → classifyQuery() (llama-3.1-8b-instant, 20토큰)
+질문 → classifyQuery() (기본 llama-3.1-8b-instant, 20토큰, 설정 패널에서 모델 변경 가능)
   → simple      세션 불필요 → Groq 직접 호출, RAG 생략
   → analytical  전체 흐름 파악 필요, 구체적 사실 불필요 → 토픽 요약만 전달
   → retrieval   구체적 사실(수치·파일명·에러명 등) 필요 → 벡터 검색 + KG → Groq
 ```
 
 분류 경계: 구체적 수치·파일명·에러명이 언급되면 무조건 `retrieval`. 모호하면 `retrieval`로 폴백.
+이 폴백 때문에 세션과 무관한 일반 질문도 retrieval로 새는 경우가 실사용에서 확인됨(예: "1+1은 뭐야"는 숫자 포함으로 강제 retrieval, "LLM이 뭐야"는 분류 모델이 모호하다고 판단해 retrieval) — 근본 수정 전까지는 설정 패널/AI 채팅 툴바의 라우팅 모드를 `simple`/`analytical`/`retrieval` 중 하나로 수동 고정해 우회 가능 (`route_query()`의 `forced_type`).
 
 ### retrieval 경로
 
@@ -396,9 +397,10 @@ GET  /api/groq-key-status           → 서버 .env 키 존재 여부 (키 값 �
 GET  /api/groq-models?api_key=      → Groq 가용 모델 목록 동적 조회
 GET  /api/chat-list?session_id=     → 대화 기록 목록
 GET  /api/chat-load?id=             → 대화 기록 전체
+GET  /api/usage-status              → Groq 사용량 조회 (모델별 사용·한도·남은 토큰·리셋까지 남은 시간)
 POST /api/groq-proxy                → Groq API 프록시 (rate limit 헤더 포함, .env 키 폴백)
 POST /api/index-session             → 임베딩 저장 (incremental 지원)
-POST /api/query-semantic            → 벡터 검색
+POST /api/query-semantic            → 쿼리 라우팅 + 벡터 검색 (routing_model, forced_type로 라우팅 모델/수동 고정 지정 가능)
 POST /api/build-kg                  → KG 빌드
 POST /api/kg-query                  → KG 엔티티/관계 검색
 POST /api/chat-save                 → 대화 기록 저장
@@ -421,22 +423,22 @@ Python이 rate limit 헤더를 읽어 응답 body에 `rate_limit` 필드로 포�
 ### 레이아웃
 
 ```
-┌─────────────┬─────────────────────────┬────────────────┐
-│   사이드바   │      대화 뷰어           │   AI 채팅 패널  │
-│  세션 목록   │  (메시지 버블 렌더링)     │  + 평가 패널   │
-│             │                         │                │
-└─────────────┴─────────────────────────┴────────────────┘
+┌─────────────┬─────────────────────────┬────────────────┬──────────┐
+│   사이드바   │      대화 뷰어           │   AI 채팅 패널  │  설정 패널 │
+│  세션 목록   │  (메시지 버블 렌더링)     │  + 평가 패널   │ (선택 열림)│
+│             │                         │                │          │
+└─────────────┴─────────────────────────┴────────────────┴──────────┘
 ```
 
 ### 주요 UI 요소
 
 - **사이드바:** 세션 목록 (제목 + 날짜 + 메시지 수) + 검색 필터
-- **대화 뷰어:** 역할별 버블, thinking 블록 기본 접힘, 라이트/다크 모드
-- **AI 채팅 패널:** 메시지 목록 + 입력 툴바
-  - 툴바: 모델 선택 + 전송 버튼 + Rate Limit 뱃지
+- **대화 뷰어:** 역할별 버블, thinking 블록 기본 접힘, 라이트/다크 모드. 각 turn에 `data-turn-index` 부여 — AI 채팅 출처 칩 클릭 시 해당 turn으로 스크롤+하이라이트
+- **AI 채팅 패널:** 메시지 목록 + 입력 툴바 + 답변마다 출처 표시(retrieval이면 턴 범위 칩, simple/analytical이면 안내 텍스트)
+  - 툴바: 답변 모델 선택 + 쿼리 라우팅 모드 선택(자동/simple/analytical/retrieval 고정, 설정 패널과 값 동기화) + 전송 버튼 + Rate Limit 뱃지
 - **청크 패널:** 토픽 목록 + 클릭 시 해당 위치 스크롤
 - **KG 패널:** 그래프 탭(vis-network) + 목록 탭
-- **설정 패널:** Groq API 키 + 모델 설정
+- **설정 패널:** AI 채팅 패널과 별도로 오른쪽에 열리는 독립 패널 (동시에 열어둘 수 있음). Groq API 키 + 답변 모델/쿼리 라우팅 모델 각각 선택 + 라우팅 모드 고정 + 오늘 Groq 사용량(모델별 막대그래프 + 리셋까지 남은 시간)
 - **평가 패널:** QA 입력 + 모드 선택 + 결과 비교
 
 ---
