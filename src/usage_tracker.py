@@ -189,3 +189,39 @@ def throttle_if_needed(rate_limit: dict) -> None:
         if wait > 0:
             print(f"  [usage] 분당 토큰 부족 ({remaining}/{limit}) → {wait:.1f}초 대기...")
             time.sleep(wait)
+
+
+if __name__ == "__main__":
+    today = _utc_today()
+    limits = _fetch_tpd_limits()
+
+    usage_file = _get_usage_file()
+    entries: list[dict] = []
+    if usage_file.exists():
+        for line in usage_file.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                entries.append(json.loads(line))
+
+    # 오늘 사용한 모델만 추려서 출력, 없으면 한도 테이블 전체
+    used_models = {e["model"] for e in entries}
+    all_models = used_models | set(limits.keys())
+
+    print(f"\n  Groq 일별 사용량  ({today} UTC)\n")
+    print(f"  {'모델':<48}  {'사용':>8}  {'한도':>8}  {'남은':>8}  {'소진':>5}")
+    print("  " + "-" * 78)
+    for model in sorted(all_models):
+        used  = sum(e["total_tokens"] for e in entries if e["model"] == model)
+        limit = limits.get(model, 0)
+        remaining = max(0, limit - used) if limit else 0
+        pct   = f"{used/limit*100:.1f}%" if limit else "—"
+        limit_str = f"{limit:,}" if limit else "—"
+        remaining_str = f"{remaining:,}" if limit else "—"
+        print(f"  {model:<48}  {used:>8,}  {limit_str:>8}  {remaining_str:>8}  {pct:>5}")
+
+    if entries:
+        print(f"\n  총 호출 수: {len(entries)}회")
+        print(f"  총 사용 토큰: {sum(e['total_tokens'] for e in entries):,}")
+        print(f"  첫 호출: {entries[0]['time']}  마지막 호출: {entries[-1]['time']}")
+    else:
+        print("\n  오늘 사용 기록 없음")
+    print()
