@@ -9,7 +9,8 @@ Claude.ai 대화 내보내기 데이터를 브라우저에서 열람하고, 대�
 - 완전 로컬 실행 — 외부 서버 없음
 - Claude.ai 내보내기 JSON 파싱 및 렌더링
 - 브랜치 대화 지원 (분기된 대화 시각화)
-- RAG 기반 AI 채팅 (fastembed + Groq)
+- RAG 기반 AI 채팅 (fastembed + Groq) — 질문을 simple/analytical/retrieval로 자동 라우팅, 답변에 근거 출처(turn) 표시
+- 설정 패널에서 API 키·모델·라우팅 모드 관리 및 Groq 사용량/한도 확인
 - 세션별 채팅 기록 저장/복원
 
 ## 설치
@@ -77,6 +78,7 @@ python -m src.evaluator --session PATH --modes baseline
     ├── server.py           HTTP 서버 + API
     ├── _groq.py            Groq API 래퍼
     ├── indexer.py          임베딩 + 벡터 검색
+    ├── usage_tracker.py    Groq 사용량 추적 + 한도 관리
     ├── evaluator.py        RAG 평가 파이프라인
     └── viewer/
         ├── index.html
