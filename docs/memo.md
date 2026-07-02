@@ -230,3 +230,73 @@ JavaScript 프론트엔드(Phase 2 app.js, Phase 7 UI) 등 AI 직군과 무관�
 
 ### 아쉬운 점
 - notebook.md에 인풋이 뭐고 아웃풋이 뭔지 자세한 설명이 없어서 힘들었음.
+
+---
+
+## Phase 4
+
+### 구현 결정
+
+**답변 모델 변경**
+- `llama-3.3-70b-versatile` → `meta-llama/llama-4-scout-17b-16e-instruct`
+- 이유: 70b TPD 100K로는 long 세션 15개 QA 1회 실행(~97,500 토큰)도 빠듯함
+- scout는 TPD 500K → 하루 여러 번 실험 가능
+
+**쿼리 라우팅 평가는 Phase 4에서 제외**
+- 라우팅 분류 자체의 정확도 평가는 별도 QA 설계 필요 → 나중에
+
+**Groq 사용량 추적 추가 (`src/usage_tracker.py`)**
+- `_groq.py` 호출 성공 시 자동으로 `usage/YYYY-MM-DD.jsonl` 기록
+- `python -m src.usage_tracker` 로 모델별 당일 사용량·잔여 토큰 확인
+- 분당 토큰 25% 미만 시 자동 sleep
+
+### 버그 수정 (indexer.py)
+
+`detect_topic_boundaries` 내 오타 2개 + `search_vector` 오타 1개:
+
+| 위치 | 버그 | 수정 |
+|------|------|------|
+| detect_topic_boundaries | `session['turn']` | `session['turns']` |
+| detect_topic_boundaries | `" ".json(...)` | `" ".join(...)` |
+| search_vector | `embed_texts(query)` | `embed_texts([query])` |
+
+두 함수 모두 오타로 인해 항상 예외 발생 → `_uniform_boundaries(n_topics=5)` fallback으로만 동작 중이었음.
+수정 후 Groq가 실제로 토픽 경계를 탐지하게 됨.
+
+### 평가 결과 (llama-4-scout, --no-judge)
+
+**짧은 대화 (8개)**
+
+| 모드 | Hit Rate | key_facts | avg tokens |
+|------|----------|-----------|------------|
+| baseline | 1.00 | 9.4 | 2,752 |
+| vector | 1.00 | 9.4 | 3,674 |
+
+→ 점수는 동일, 토큰은 vector가 더 많음 (short는 차이가 미미)
+
+**긴 대화 (15개)**
+
+| 모드 | Hit Rate | key_facts | avg tokens |
+|------|----------|-----------|------------|
+| baseline | 0.98 | 9.3 | 2,368 |
+| vector | 1.00 | 8.8 | 10,391 |
+
+→ 검색(Hit Rate)은 vector가 더 좋음 (multihop 0.93 → 1.00)
+→ 답변(key_facts)은 vector가 더 낮음 — 토픽 원문 top_k=3이 10K 토큰 → LLM이 중간 정보를 놓치는 "lost in the middle" 현상
+
+### 결론 및 다음 단계
+
+- **vector 검색 채택** — Hit Rate가 baseline보다 높으므로 검색 방식은 vector로 확정
+- **남은 과제** — LLM에 넘기는 컨텍스트 크기를 줄여 답변 품질 복구
+  - 후보: top_k 축소, 토픽 원문 길이 제한
+  - 목표: vector keyfact가 baseline(9.3) 이상이 되면 Phase 4 완료
+
+### Phase 5 진행 조건
+
+현재 데이터셋(eval-long-001, 15개 QA)으로는 Phase 5가 필요한 시나리오가 나타나지 않음.
+Hit Rate가 이미 1.00이므로 인접 게이팅·KG를 추가해도 검색이 더 좋아질 여지가 없음.
+
+Phase 5는 아래 조건이 갖춰진 뒤 진행:
+1. 더 복잡한 평가 데이터셋 구축 — 토픽 20개 이상의 긴 대화, 3홉 이상 multihop 질문
+2. 새 데이터셋에서 vector만으로 못 잡는 케이스가 실제로 나올 때 인접 게이팅·KG 추가
+3. Phase 5 구현 후 새 데이터셋 기준으로 비교 평가
