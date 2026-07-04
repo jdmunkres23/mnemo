@@ -115,6 +115,7 @@ def chat_completion(
             error_msg = body['error']['message']
             if exc.code == 429 and attempt < 3:
                 wait = extract_wait_seconds(error_msg) + 2.0
+                print(f"  [groq] 429 rate limit, {wait:.1f}초 대기 후 재시도 ({attempt + 1}/4)...")
                 time.sleep(wait)
                 continue
             else:
