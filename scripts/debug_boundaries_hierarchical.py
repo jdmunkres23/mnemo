@@ -9,7 +9,6 @@
 # 2단계: 거친 경계로 나뉜 각 구간마다 boundary_v3_split_check.txt로 N번 호출 -> 역시 다수결로 세부 경계 확정
 # 결과를 scripts/debug_boundaries_hierarchical_log.jsonl에 한 줄(JSON)로 저장
 
-import itertools
 import json
 import re
 import statistics
@@ -26,7 +25,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src._groq import chat_completion, load_env_key
 
-MODEL = sys.argv[1] if len(sys.argv) > 1 else "llama-3.3-70b-versatile"
+MODEL = sys.argv[1] if len(sys.argv) > 1 else "meta-llama/llama-4-scout-17b-16e-instruct"# "llama-3.3-70b-versatile"
 N_RUNS = int(sys.argv[2]) if len(sys.argv) > 2 else 5
 THRESHOLD = float(sys.argv[3]) if len(sys.argv) > 3 else 0.5
 SESSION_FILE = sys.argv[4] if len(sys.argv) > 4 else "eval-long-001.session.json"
@@ -52,28 +51,53 @@ print(f"세션: {SESSION_FILE} / 사용자 turn 개수: {len(all_user_msgs)}")
 
 def optimal_1d_partition(values, k):
     """정렬된 1차원 값을 SSE(그룹 내 편차 제곱합) 최소가 되도록 k개의 연속 구간으로 나눈다.
-    1차원에서는 최적 분할이 항상 정렬 순서상 연속 구간이므로,
-    절단점 k-1개의 조합을 전수조사해서 진짜 최적해를 구한다 (Lloyd's algorithm 불필요)."""
+    1차원에서는 최적 분할이 항상 정렬 순서상 연속 구간이므로 DP로 O(n^2*k)에 정확한 최적해를 구한다.
+    (절단점 조합을 전수조사하는 방식은 n·k가 커지면 조합 수가 폭발해 1단계처럼 run이 많고
+    값이 많은 경우 몇 분씩 걸릴 수 있어 DP로 교체함)"""
     values = sorted(values)
     n = len(values)
     if k <= 1 or n <= k:
         return [values]
 
-    def sse(group):
-        if not group:
+    prefix = [0.0] * (n + 1)
+    prefix_sq = [0.0] * (n + 1)
+    for i, v in enumerate(values):
+        prefix[i + 1] = prefix[i] + v
+        prefix_sq[i + 1] = prefix_sq[i] + v * v
+
+    def cost(i, j):
+        if j <= i:
             return 0.0
-        m = statistics.mean(group)
-        return sum((v - m) ** 2 for v in group)
+        s = prefix[j] - prefix[i]
+        sq = prefix_sq[j] - prefix_sq[i]
+        cnt = j - i
+        return sq - (s * s) / cnt
 
-    best_groups, best_sse = None, float("inf")
-    for cuts in itertools.combinations(range(1, n), k - 1):
-        bounds = (0,) + cuts + (n,)
-        groups = [values[bounds[i]:bounds[i + 1]] for i in range(k)]
-        total = sum(sse(g) for g in groups)
-        if total < best_sse:
-            best_sse, best_groups = total, groups
+    INF = float("inf")
+    dp = [[INF] * (n + 1) for _ in range(k + 1)]
+    dp[0][0] = 0.0
+    split_point = [[0] * (n + 1) for _ in range(k + 1)]
 
-    return best_groups
+    for g in range(1, k + 1):
+        for j in range(g, n + 1):
+            best_cost, best_i = INF, g - 1
+            for i in range(g - 1, j):
+                c = dp[g - 1][i] + cost(i, j)
+                if c < best_cost:
+                    best_cost, best_i = c, i
+            dp[g][j] = best_cost
+            split_point[g][j] = best_i
+
+    bounds = [n]
+    g, j = k, n
+    while g > 0:
+        i = split_point[g][j]
+        bounds.append(i)
+        j = i
+        g -= 1
+    bounds.reverse()
+
+    return [values[bounds[t]:bounds[t + 1]] for t in range(k)]
 
 
 def determine_boundaries(per_run_boundaries, n_runs, valid_idxs):
