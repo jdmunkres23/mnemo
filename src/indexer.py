@@ -185,6 +185,9 @@ def search(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
 VECTOR_INDEX_FILENAME = "vector_index.json"
 
 _FAST_MODEL = "llama-3.1-8b-instant"
+_BOUNDARY_MODEL = "llama-3.3-70b-versatile"
+_BOUNDARY_N_RUNS = 5
+_BOUNDARY_THRESHOLD = 0.5
 
 from src._groq import chat_completion, load_env_key
 from src.indexer import embed_texts, cosine_similarity, format_turn
@@ -207,8 +210,116 @@ def _uniform_boundaries(session: dict, n_topics: int = 5) -> list[int]:
     boundaries = [user_idxs[step * k] for k in range(1, n_topics) if step * k < len(user_idxs)]
     return boundaries
 
+def _optimal_1d_partition(values: list[int], k: int) -> list[list[int]]:
+    """정렬된 1차원 값을 SSE(그룹 내 편차 제곱합) 최소가 되도록 k개의 연속 구간으로 나눈다.
+
+    1차원에서는 최적 분할이 항상 정렬 순서상 연속 구간이므로, 동적계획법으로 O(n^2*k)에
+    정확한 최적해를 구한다 (절단점 조합 전수조사는 n·k가 커지면 조합이 폭발함).
+    """
+    values = sorted(values)
+    n = len(values)
+    if k <= 1:
+        return [values]
+    if n <= k:
+        return [[v] for v in values]  # 값 개수가 그룹 수 이하 -> 값마다 자기 그룹
+
+    prefix = [0.0] * (n + 1)
+    prefix_sq = [0.0] * (n + 1)
+    for i, v in enumerate(values):
+        prefix[i + 1] = prefix[i] + v
+        prefix_sq[i + 1] = prefix_sq[i] + v * v
+
+    def cost(i, j):
+        if j <= i:
+            return 0.0
+        s = prefix[j] - prefix[i]
+        sq = prefix_sq[j] - prefix_sq[i]
+        cnt = j - i
+        return sq - (s * s) / cnt
+
+    INF = float("inf")
+    dp = [[INF] * (n + 1) for _ in range(k + 1)]
+    dp[0][0] = 0.0
+    split_point = [[0] * (n + 1) for _ in range(k + 1)]
+
+    for g in range(1, k + 1):
+        for j in range(g, n + 1):
+            best_cost, best_i = INF, g - 1
+            for i in range(g - 1, j):
+                c = dp[g - 1][i] + cost(i, j)
+                if c < best_cost:
+                    best_cost, best_i = c, i
+            dp[g][j] = best_cost
+            split_point[g][j] = best_i
+
+    bounds = [n]
+    g, j = k, n
+    while g > 0:
+        i = split_point[g][j]
+        bounds.append(i)
+        j = i
+        g -= 1
+    bounds.reverse()
+
+    return [values[bounds[t]:bounds[t + 1]] for t in range(k)]
+
+
+def _determine_boundaries(per_run_boundaries: list[list[int]], valid_idxs: list[int],
+                           threshold: float = _BOUNDARY_THRESHOLD) -> list[int]:
+    """run별로 낸 경계 개수의 최빈값을 진짜 경계 개수(k)로 채택하고, 그 최빈값 비율이
+    threshold 이상일 때만 신뢰한다. 전체 값을 _optimal_1d_partition으로 k개 그룹으로 나누고,
+    각 그룹의 중앙값을 가장 가까운 유효 인덱스로 스냅해 확정 경계로 반환한다.
+
+    (배치 크기에 따라 reduction 연산 순서가 달라져 temperature=0에도 완전히 결정적이지
+    않은 Groq 추론 특성 때문에, 단일 호출 대신 여러 번 호출해 다수결로 안정성을 확보한다.)
+    """
+    import statistics
+    from collections import Counter
+
+    n_runs = len(per_run_boundaries)
+    counts_per_run = [len(set(b)) for b in per_run_boundaries]
+    mode_k, mode_freq = Counter(counts_per_run).most_common(1)[0]
+
+    if mode_k == 0 or mode_freq / n_runs < threshold:
+        return []
+
+    pooled = [v for boundaries in per_run_boundaries for v in set(boundaries)]
+    groups = _optimal_1d_partition(pooled, mode_k)
+
+    confirmed = []
+    for g in groups:
+        if not g:
+            continue
+        med = statistics.median(g)
+        rep = min(valid_idxs, key=lambda x: (abs(x - med), x))
+        confirmed.append(rep)
+
+    return sorted(set(confirmed))
+
+
+def _vote_boundaries(prompt: str, turns_len: int, user_idxs_set: set[int], api_key: str,
+                      exclude: set[int] = frozenset()) -> list[int]:
+    """같은 프롬프트를 _BOUNDARY_N_RUNS번 호출하고 _determine_boundaries()로 확정 경계를 반환한다.
+    exclude: 후보에서 제외할 인덱스 (예: 세그먼트 자기 자신의 시작 turn)."""
+    import re
+
+    valid_idxs = sorted(user_idxs_set - set(exclude))
+    per_run_boundaries = []
+    for _ in range(_BOUNDARY_N_RUNS):
+        content, usage, _ = chat_completion(
+            [{'role': 'user', 'content': prompt}],
+            _BOUNDARY_MODEL, api_key, max_tokens=300, temperature=0.0
+        )
+        nums = re.findall(r'\d+', content)
+        boundaries = [int(n) for n in nums]
+        boundaries = [b for b in boundaries if 1 <= b <= turns_len - 1 and b in user_idxs_set and b not in exclude]
+        per_run_boundaries.append(boundaries)
+
+    return _determine_boundaries(per_run_boundaries, valid_idxs)
+
+
 def detect_topic_boundaries(session: dict, api_key: str) -> list[int]:
-    """사용자 메시지에서 토픽 경계 인덱스를 탐지한다. (노트북 04-1 섹션 1 참고)
+    """사용자 메시지에서 토픽 경계 인덱스를 탐지한다. (노트북 04-1 섹션 1, 안정성 조사 참고)
 
     입력:
       session: {"turns": [{"role": "user"|"assistant", "blocks": [...]}, ...], ...}
@@ -218,16 +329,13 @@ def detect_topic_boundaries(session: dict, api_key: str) -> list[int]:
       [int, ...] — 경계가 되는 turn 인덱스 목록 (0-based, session["turns"] 기준)
       예: [4, 9]  → turns 0~3 / 4~8 / 9~끝 세 그룹
 
+    계층적 분류(1단계: 전체 대화 거친 분류 → 2단계: 구간별 세분화) + 자기일관성 다수결로 탐지한다.
+    각 단계는 _BOUNDARY_N_RUNS번 호출해 _determine_boundaries()로 확정한다.
+    llama-3.1-8b-instant는 이 판단에서 응답이 재현되지 않아(10회 중 0회 일치) 배제하고
+    llama-3.3-70b-versatile로 교체함 — 세션당 1회만 호출되는 저빈도 작업이라 호출 수가
+    늘어도 비용 부담이 낮다.
     Groq 호출 실패 시 _uniform_boundaries(session) fallback.
     """
-    # 1. [(i, text)] 형태로 사용자 turn 추출
-    # 2. 사용자 turn 1개 이하 → [] 반환
-    # 3. "i: 메시지\n..." 프롬프트 구성
-    # 4. llama-3.1-8b-instant 호출 (max_tokens=300, temperature=0.0)
-    # 5. re.findall(r'\d+', content) → 정수 변환
-    # 6. 유효 범위 필터: 1 이상 len(turns)-1 이하
-    # 7. 예외 → _uniform_boundaries(session)
-    import re
     try:
         turns = session['turns']
         user_msgs = []
@@ -238,27 +346,51 @@ def detect_topic_boundaries(session: dict, api_key: str) -> list[int]:
 
         if len(user_msgs) <= 1:
             return []
-        prompt_input = "\n".join(f"{i}: {text}" for i, text in user_msgs)
-        prompt = f"""아래는 대화에서 사용자가 보낸 메시지 목록입니다 (형식: turn인덱스: 메시지).
-        주제가 크게 바뀌는 경계 직전의 turn 인덱스를 JSON 배열로 반환하세요.
-        경계가 없으면 [] 를 반환하세요.
-        숫자 배열만 출력, 설명 없이.
-
-        {prompt_input}
-
-        경계 인덱스:"""
-
-        content, usage, _ = chat_completion(
-            [{'role': 'user', 'content': prompt}],
-            'llama-3.1-8b-instant', api_key, max_tokens=300, temperature=0.0
-        )
-        nums = re.findall(f'\d+', content)
-        boundaries = [int(n) for n in nums]
 
         user_idxs_set = set(i for i, _ in user_msgs)
-        boundaries = [b for b in boundaries if 1 <= b <= len(turns) - 1 and b in user_idxs_set]
-        
-        return boundaries
+
+        # 1단계: 거친 분류
+        prompt_input = "\n".join(f"{i}: {text}" for i, text in user_msgs)
+        coarse_prompt = f"""아래는 대화에서 사용자가 보낸 메시지 목록입니다 (형식: turn인덱스: 메시지).
+주제가 크게 바뀌는 경계 직전의 turn 인덱스를 JSON 배열로 반환하세요.
+경계가 없으면 [] 를 반환하세요.
+숫자 배열만 출력, 설명 없이.
+
+{prompt_input}
+
+경계 인덱스:"""
+
+        coarse_boundaries = _vote_boundaries(coarse_prompt, len(turns), user_idxs_set, api_key)
+
+        # 2단계: 세그먼트별 세분화
+        starts = [0] + coarse_boundaries
+        ends = coarse_boundaries + [len(turns)]
+        final_boundaries = list(coarse_boundaries)
+
+        for seg_start, seg_end in zip(starts, ends):
+            seg_user_msgs = [(i, t) for i, t in user_msgs if seg_start <= i < seg_end]
+            if len(seg_user_msgs) <= 2:
+                continue
+
+            seg_prompt_input = "\n".join(f"{i}: {text}" for i, text in seg_user_msgs)
+            split_prompt = f"""아래는 어떤 대화의 한 구간입니다. 이 구간은 이미 하나의 큰 주제로 묶여 있습니다.
+사용자가 보낸 메시지 목록입니다 (형식: turn인덱스: 메시지).
+
+이 구간 안에서 다시 주제가 크게 바뀌는 지점이 있다면, 그 경계 직전의 turn 인덱스를 JSON 배열로 반환하세요.
+이 구간을 더 나눌 필요가 없다면(하나의 흐름으로 자연스럽게 이어진다면) [] 를 반환하세요.
+숫자 배열만 출력, 설명 없이.
+
+{seg_prompt_input}
+
+경계 인덱스:"""
+
+            seg_user_idxs = set(i for i, _ in seg_user_msgs)
+            sub_boundaries = _vote_boundaries(
+                split_prompt, len(turns), seg_user_idxs, api_key, exclude={seg_start}
+            )
+            final_boundaries.extend(sub_boundaries)
+
+        return sorted(set(final_boundaries))
     except Exception:
         return _uniform_boundaries(session)
 
