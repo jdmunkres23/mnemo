@@ -188,6 +188,9 @@ _FAST_MODEL = "llama-3.1-8b-instant"
 _BOUNDARY_MODEL = "llama-3.3-70b-versatile"
 _BOUNDARY_N_RUNS = 5
 _BOUNDARY_THRESHOLD = 0.5
+_SUMMARY_MODEL = _FAST_MODEL           # 긴 메시지 요약용 (검증되면 이 줄만 교체)
+_LONG_MESSAGE_THRESHOLD = 300          # 이 길이(자) 넘는 사용자 메시지만 요약
+_MAX_MESSAGES_PER_WINDOW = 30          # 이 개수 넘으면 윈도우로 나눠 1단계 처리
 
 from src._groq import chat_completion, load_env_key
 from src.indexer import embed_texts, cosine_similarity, format_turn
@@ -318,6 +321,106 @@ def _vote_boundaries(prompt: str, turns_len: int, user_idxs_set: set[int], api_k
     return _determine_boundaries(per_run_boundaries, valid_idxs)
 
 
+def _summarize_if_long(text: str, api_key: str) -> str:
+    """길이가 _LONG_MESSAGE_THRESHOLD를 넘는 사용자 메시지를 1~2문장으로 요약한다.
+    브레인스토밍처럼 긴 메시지 하나가 다른 메시지 대비 과도하게 큰 신호가 되는 걸 막기 위함.
+    짧으면 그대로 반환. Groq 호출 실패 시 text[:200] fallback."""
+    if len(text) <= _LONG_MESSAGE_THRESHOLD:
+        return text
+
+    summary_prompt = f"""다음 메시지를 핵심 내용만 남겨 1~2문장으로 요약하세요.
+고유명사, 경로, 설정값, 에러명은 원문 그대로 포함하세요.
+
+{text[:4000]}
+
+요약:"""
+    try:
+        content, usage, _ = chat_completion(
+            [{'role': 'user', 'content': summary_prompt}],
+            _SUMMARY_MODEL, api_key, max_tokens=150, temperature=0.0
+        )
+        return content
+    except Exception:
+        return text[:200]
+
+
+def _coarse_prompt(prompt_input: str) -> str:
+    """1단계(거친 분류)용 프롬프트를 만든다. 전체 대화든 윈도우 하나든 동일하게 쓴다."""
+    return f"""아래는 대화에서 사용자가 보낸 메시지 목록입니다 (형식: turn인덱스: 메시지).
+주제가 크게 바뀌는 경계 직전의 turn 인덱스를 JSON 배열로 반환하세요.
+경계가 없으면 [] 를 반환하세요.
+숫자 배열만 출력, 설명 없이.
+
+{prompt_input}
+
+경계 인덱스:"""
+
+
+def _windowed_coarse_boundaries(user_msgs: list[tuple[int, str]], turns: list[dict], api_key: str) -> list[int]:
+    """사용자 메시지가 _MAX_MESSAGES_PER_WINDOW개를 넘는 대화의 1단계 처리.
+
+    _MAX_MESSAGES_PER_WINDOW개씩 윈도우로 나눠 각 윈도우 안에서 독립적으로 거친 분류를 하고,
+    윈도우 이음매(서로 다른 호출이라 원래 이어져 있어도 모르는 인위적 절단)마다
+    앞뒤 세그먼트의 임베딩 유사도를 확인해 병합 여부를 정한다.
+
+    임계값은 고정값이 아니라 "이 대화 안에서 실제로 확인된 전환(각 윈도우 내부 세그먼트 간
+    유사도)"의 최댓값을 그 대화 자신의 기준으로 삼는다 — 대화마다 문체·언어·주제 밀도가 달라
+    절대적인 유사도 수준이 다를 수 있어서, 세션마다 유동적으로 정해야 다른 대화에 일반화된다.
+    이음매 유사도가 이 기준보다 높으면(=이 대화 기준으로 "진짜 전환"치고는 덜 떨어짐) 병합.
+    """
+    windows = [user_msgs[i:i + _MAX_MESSAGES_PER_WINDOW]
+               for i in range(0, len(user_msgs), _MAX_MESSAGES_PER_WINDOW)]
+
+    window_ranges = []
+    for i in range(len(windows)):
+        start = windows[i][0][0]
+        end = windows[i + 1][0][0] if i + 1 < len(windows) else len(turns)
+        window_ranges.append((start, end))
+
+    per_window_internal = []
+    for w in windows:
+        w_idxs = set(i for i, _ in w)
+        prompt_input = "\n".join(f"{i}: {text}" for i, text in w)
+        internal = _vote_boundaries(_coarse_prompt(prompt_input), len(turns), w_idxs, api_key)
+        per_window_internal.append(internal)
+
+    # 이 대화 안에서 실제로 확인된 전환들의 유사도 분포(윈도우 내부 인접 세그먼트끼리)
+    reference_sims = []
+    for (w_start, w_end), internal in zip(window_ranges, per_window_internal):
+        bounds = [w_start] + internal + [w_end]
+        seg_texts = [format_turns_as_text(turns[bounds[i]:bounds[i + 1]]) for i in range(len(bounds) - 1)]
+        seg_texts = [t for t in seg_texts if t]
+        if len(seg_texts) >= 2:
+            embs = embed_texts(seg_texts)
+            for i in range(len(embs) - 1):
+                reference_sims.append(cosine_similarity(embs[i], embs[i + 1]))
+
+    merge_threshold = max(reference_sims) if reference_sims else None
+
+    boundaries = []
+    for internal in per_window_internal:
+        boundaries.extend(internal)
+
+    for i in range(len(windows) - 1):
+        seam = window_ranges[i + 1][0]
+        prev_start = per_window_internal[i][-1] if per_window_internal[i] else window_ranges[i][0]
+        next_end = per_window_internal[i + 1][0] if per_window_internal[i + 1] else window_ranges[i + 1][1]
+
+        text_before = format_turns_as_text(turns[prev_start:seam])
+        text_after = format_turns_as_text(turns[seam:next_end])
+
+        should_merge = False
+        if text_before and text_after and merge_threshold is not None:
+            embs = embed_texts([text_before, text_after])
+            seam_sim = cosine_similarity(embs[0], embs[1])
+            should_merge = seam_sim > merge_threshold
+
+        if not should_merge:
+            boundaries.append(seam)
+
+    return sorted(set(boundaries))
+
+
 def detect_topic_boundaries(session: dict, api_key: str) -> list[int]:
     """사용자 메시지에서 토픽 경계 인덱스를 탐지한다. (노트북 04-1 섹션 1, 안정성 조사 참고)
 
@@ -334,6 +437,10 @@ def detect_topic_boundaries(session: dict, api_key: str) -> list[int]:
     llama-3.1-8b-instant는 이 판단에서 응답이 재현되지 않아(10회 중 0회 일치) 배제하고
     llama-3.3-70b-versatile로 교체함 — 세션당 1회만 호출되는 저빈도 작업이라 호출 수가
     늘어도 비용 부담이 낮다.
+
+    사용자 메시지가 길면(_LONG_MESSAGE_THRESHOLD 초과) 요약해서 프롬프트에 넣고,
+    메시지 개수가 많으면(_MAX_MESSAGES_PER_WINDOW 초과) 1단계를 윈도우로 나눠 처리한다
+    (_windowed_coarse_boundaries 참고).
     Groq 호출 실패 시 _uniform_boundaries(session) fallback.
     """
     try:
@@ -342,6 +449,7 @@ def detect_topic_boundaries(session: dict, api_key: str) -> list[int]:
         for i, turn in enumerate(turns):
             if turn['role'] == 'user':
                 text = " ".join(b['text'] for b in turn['blocks'] if b['type'] == 'text')
+                text = _summarize_if_long(text, api_key)
                 user_msgs.append((i, text))
 
         if len(user_msgs) <= 1:
@@ -350,17 +458,11 @@ def detect_topic_boundaries(session: dict, api_key: str) -> list[int]:
         user_idxs_set = set(i for i, _ in user_msgs)
 
         # 1단계: 거친 분류
-        prompt_input = "\n".join(f"{i}: {text}" for i, text in user_msgs)
-        coarse_prompt = f"""아래는 대화에서 사용자가 보낸 메시지 목록입니다 (형식: turn인덱스: 메시지).
-주제가 크게 바뀌는 경계 직전의 turn 인덱스를 JSON 배열로 반환하세요.
-경계가 없으면 [] 를 반환하세요.
-숫자 배열만 출력, 설명 없이.
-
-{prompt_input}
-
-경계 인덱스:"""
-
-        coarse_boundaries = _vote_boundaries(coarse_prompt, len(turns), user_idxs_set, api_key)
+        if len(user_msgs) <= _MAX_MESSAGES_PER_WINDOW:
+            prompt_input = "\n".join(f"{i}: {text}" for i, text in user_msgs)
+            coarse_boundaries = _vote_boundaries(_coarse_prompt(prompt_input), len(turns), user_idxs_set, api_key)
+        else:
+            coarse_boundaries = _windowed_coarse_boundaries(user_msgs, turns, api_key)
 
         # 2단계: 세그먼트별 세분화
         starts = [0] + coarse_boundaries
