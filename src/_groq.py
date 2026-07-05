@@ -37,8 +37,14 @@ def load_env_key() -> str:
 
 
 def extract_wait_seconds(error_msg: str, default: float = 60.0) -> float:
-    m = re.search(r"try again in ([\d.]+)s", error_msg)
-    return float(m.group(1)) if m else default
+    # 분당 한도는 "20.5s", 일일 한도(TPD)는 "4m22.656s"/"1h4m22.656s"처럼 h/m가 붙어서 옴
+    m = re.search(r"try again in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)s", error_msg)
+    if not m:
+        return default
+    hours = float(m.group(1)) if m.group(1) else 0.0
+    minutes = float(m.group(2)) if m.group(2) else 0.0
+    seconds = float(m.group(3))
+    return hours * 3600 + minutes * 60 + seconds
 
 
 def chat_completion(
@@ -109,6 +115,7 @@ def chat_completion(
             error_msg = body['error']['message']
             if exc.code == 429 and attempt < 3:
                 wait = extract_wait_seconds(error_msg) + 2.0
+                print(f"  [groq] 429 rate limit, {wait:.1f}초 대기 후 재시도 ({attempt + 1}/4)...")
                 time.sleep(wait)
                 continue
             else:
