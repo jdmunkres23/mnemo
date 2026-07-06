@@ -61,7 +61,8 @@ project-root/
 │   ├── phase2/            서버 + 뷰어 실습
 │   ├── phase3/            baseline RAG + 평가 실습
 │   ├── phase4/            벡터 검색 실습
-│   └── phase5/            점진적 개선 실습 (인접 게이팅, KG)
+│   ├── phase5/            명제 단위(Dense X) 임베딩 실습
+│   └── phase6/            점진적 개선 실습 (인접 게이팅, KG)
 │   (각 phase 폴더: [주제]_theory.md + [번호]_[주제]_notebook.md, AI 무관 영역은 _overview.md)
 ├── conversations_learning/       변환된 세션 데이터 (gitignore)
 ├── eval_data/             평가용 합성 대화·QA 쌍·결과 (gitignore)
@@ -149,12 +150,16 @@ Phase 4 — vector
   토픽 기반 청크 분할 + 요약 임베딩 + fastembed 벡터 검색 → 관련 청크 → Groq → 답변
   평가: baseline 대비 Hit Rate + Correctness + Token Usage 비교
     ↓
-Phase 5 — vector_adjacent → vector_kg (greedy sequential)
-  인접 게이팅 추가 → 평가 → 개선되면 채택
-  벡터 KG 추가   → 평가 → 개선되면 채택
+Phase 5 — dense_x
+  vector의 토픽 압축 희석 문제(큰 토픽이 요약 하나로 뭉개짐) 근본 수정
+  평가: vector 대비 paraphrase/single Hit Rate 비교
     ↓
-Phase 6 — dense_x / hyde (선택)
-  Phase 5 평가 결과에서 개선 여지가 있을 때만 구현
+Phase 6 — vector_adjacent → vector_kg (greedy sequential)
+  인접 게이팅 추가 → 평가 → 개선되면 채택
+  벡터 KG 추가   → 평가 → 개선되면 채택 (dense_x 위에서 재평가)
+    ↓
+Phase 7 — hyde (선택)
+  Phase 6 평가 결과에서 개선 여지가 있을 때만 구현
 ```
 
 ### 인덱싱 흐름 (Phase 3)
@@ -190,7 +195,7 @@ session.json
       multilingual-e5-large, ONNX CPU 추론
   → session_index.json 저장
       { summary, embedding, position, turn_start, turn_end }
-  → KG 빌드 (백그라운드, Phase 5~)
+  → KG 빌드 (백그라운드, Phase 6~)
       청크별 엔티티/관계 추출 → knowledge_graph.db
 ```
 
@@ -221,7 +226,7 @@ session.json
   누락(인접한 두 청크로 남는 것, 인접 게이팅으로 어느 정도 보완 가능)보다 되돌리기 어려우므로
   기준은 최댓값(가장 보수적인 값)으로 잡는다.
 
-### 인접 토픽 게이팅 (Phase 5~)
+### 인접 토픽 게이팅 (Phase 6~)
 
 ±1 인접 토픽을 **무조건 추가하지 않는다.**
 임베딩은 이미 저장되어 있으므로 추가 비용 없이 실제 유사도 측정.
@@ -235,7 +240,7 @@ for neighbor in adjacent_topics:
         context_topics.append(ctx)
 ```
 
-### 벡터 KG (Phase 5~)
+### 벡터 KG (Phase 6~)
 
 엔티티 검색을 키워드 LIKE → 코사인 유사도로 전환.
 "라이브러리 설치 문제" → fastembed 매칭 가능.
@@ -257,7 +262,13 @@ relations          — source_name, relation, target_name, topic_idx
 엔티티 타입: `concept | error | tool | path | config | term`
 관계 타입: `uses | requires | defines | resolves | leads_to | relates_to`
 
-### Dense X 명제 모드 (Phase 6, 선택)
+### Dense X 명제 모드 (Phase 5)
+
+Phase 4 vector 평가에서 QA 표본을 늘릴수록 baseline보다 낮게 나온 원인 진단 결과,
+토픽 경계 탐지가 관대해 토픽 하나에 여러 사실이 뭉치고(예: 6751자/6개 사실짜리
+토픽) 이를 2~3문장 요약으로 압축하며 개별 사실이 희석되는 것으로 확인됨. 원래
+Phase 6(선택)이었으나, 인접 게이팅·KG(현 Phase 6)보다 먼저 이 근본 원인을
+고치기로 순서 변경.
 
 ```
 청크 → Groq로 원자적 명제 추출 → 명제별 fastembed 임베딩
@@ -269,7 +280,7 @@ session_index.json에 propositions[] 배열로 추가 저장 (topics[] 병존)
 - 고유명사·경로·에러명은 원문 그대로 포함
 - 하나의 사실 = 하나의 문장
 
-### HyDE (Phase 6, 선택)
+### HyDE (Phase 7, 선택)
 
 ```
 질문 → Groq: 가상의 짧은 답변 생성 → 가상 답변 임베딩 → 토픽 벡터와 비교
@@ -304,8 +315,8 @@ session_index.json에 propositions[] 배열로 추가 저장 (topics[] 병존)
 
 ```
 벡터 검색: 질문 임베딩 → 코사인 유사도 top_k=3
-           + 인접 게이팅 (유사도 > 0.3인 ±1 토픽만 추가, Phase 5~)
-KG 검색:  엔티티 벡터 유사도 → 매칭 엔티티의 1홉 관계 자동 포함 (Phase 5~)
+           + 인접 게이팅 (유사도 > 0.3인 ±1 토픽만 추가, Phase 6~)
+KG 검색:  엔티티 벡터 유사도 → 매칭 엔티티의 1홉 관계 자동 포함 (Phase 6~)
 
 system 프롬프트:
   [주요 내용]   원본 대화 텍스트 (Small-to-Big)
@@ -356,10 +367,10 @@ QA 쌍 스키마 (`eval_data/eval-*.qa_pairs.json`):
 |------|-----------|----------|
 | `baseline` | Phase 3 | 고정 크기 청크 + 벡터 검색 |
 | `vector` | Phase 4 | 토픽 기반 청크 + 벡터 검색 |
-| `vector_adjacent` | Phase 5 | vector + 인접 게이팅 |
-| `vector_kg` | Phase 5 | vector_adjacent + 벡터 KG |
-| `hyde` | Phase 6 | HyDE 쿼리 확장 + vector |
-| `dense_x` | Phase 6 | 명제 단위 벡터 검색 |
+| `dense_x` | Phase 5 | 명제 단위 벡터 검색 |
+| `vector_adjacent` | Phase 6 | vector + 인접 게이팅 |
+| `vector_kg` | Phase 6 | vector_adjacent + 벡터 KG |
+| `hyde` | Phase 7 | HyDE 쿼리 확장 + vector |
 
 ### 평가 지표
 
@@ -491,15 +502,25 @@ Phase 4.5  토픽 경계 탐지 안정성 개선 (실사용 중 발견)
            자기일관성 다수결로 안정화
          긴 사용자 메시지 요약 + 긴 대화(30개 초과) 윈도우 분할·이음매 유사도 병합 추가
 
-Phase 5  점진적 개선 + 평가 (greedy sequential)
+Phase 5  Dense X (명제 단위 임베딩) — vector 저하 원인 수정
+         평가에서 vector가 QA 표본을 늘릴수록 baseline보다 낮게 나옴을 확인 →
+         원인: 토픽 경계 탐지가 관대해 토픽 하나에 여러 사실이 뭉치고(예: 6751자/
+         6개 사실), 이를 2~3문장 요약으로 압축하며 개별 사실이 희석됨
+         → 토픽 원문을 원자적 명제로 쪼개 각각 임베딩 (topics[]는 Small-to-Big
+         답변용으로 병존)
+         평가: vector 대비 paraphrase/single Hit Rate 비교
+         (원래 Phase 6이었으나 인접 게이팅·KG보다 먼저 진행 — 핵심 설계 원칙 7 참고)
+
+Phase 6  점진적 개선 + 평가 (greedy sequential)
          인접 게이팅 추가 → 평가 → 채택 여부 결정
          벡터 KG 추가   → 평가 → 채택 여부 결정
+         (dense_x 위에서 재평가 — KG의 동의어 매칭 역할이 dense_x와 겹쳐 순서가
+         바뀌면 효과가 왜곡될 수 있음)
 
-Phase 6  실험적 기법 (Phase 5 결과 기반으로 필요한 것만)
-         Dense X (명제 단위 임베딩)
+Phase 7  실험적 기법 (Phase 6 결과 기반으로 필요한 것만)
          HyDE (가상 문서 쿼리 확장)
 
-Phase 7  UI 완성
+Phase 8  UI 완성
          청크 패널 + KG 패널 + 평가 패널 + 설정 패널
 ```
 
@@ -513,6 +534,8 @@ Phase 7  UI 완성
 4. **Small-to-Big** — 요약으로 검색, 원문을 LLM에 전달
 5. **역할 분리** — 의미 검색은 벡터, 관계 탐색은 KG
 6. **인접 게이팅** — 무조건 추가 아닌 유사도 임계값 통과 시만 추가
+7. **근본 원인 우선** — 회피(인접 게이팅)나 부분 보완(KG의 동의어 매칭)보다, 진단된
+   근본 원인(토픽 압축 희석)을 먼저 고치고 그 위에서 나머지를 평가한다
 
 ---
 
