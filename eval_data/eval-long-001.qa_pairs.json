@@ -186,5 +186,77 @@
       "4096",
       "2048"
     ]
+  },
+  {
+    "question": "체크포인트를 몇 스텝마다 저장하고, 최대 몇 개까지 보관하도록 설정했나요?",
+    "expected": "500 스텝마다 저장하고(save_steps 500), 최대 3개(save_total_limit 3)만 보관하도록 했습니다.",
+    "source_turns": [
+      19
+    ],
+    "type": "single",
+    "key_facts": [
+      "500",
+      "3"
+    ]
+  },
+  {
+    "question": "LoRA 어댑터를 베이스 모델에 병합(merge)하기로 한 이유와, 병합 시 dtype과 관련해 주의한 점은 무엇이었나요?",
+    "expected": "추론 시 LoRA 연산 오버헤드가 없어 빠르고 vLLM이 일반 모델로 취급할 수 있어서 병합하기로 했고, 병합 dtype은 학습 때와 같은 bf16으로 맞춰야 한다(fp16으로 병합하면 미세한 수치 차이로 성능이 흔들릴 수 있음)는 점을 주의했습니다.",
+    "source_turns": [
+      35
+    ],
+    "type": "single",
+    "key_facts": [
+      "bf16",
+      "오버헤드"
+    ]
+  },
+  {
+    "question": "추론 샘플링 기본값으로 temperature와 top_p를 각각 얼마로 정했나요?",
+    "expected": "temperature 0.7, top_p 0.9로 정했습니다.",
+    "source_turns": [
+      45
+    ],
+    "type": "single",
+    "key_facts": [
+      "0.7",
+      "0.9"
+    ]
+  },
+  {
+    "question": "4-bit 양자화 버전과 bf16 버전을 실제 서빙 조건에서 다시 비교할 때, 어떤 기준으로 결정하기로 했나요?",
+    "expected": "정확도 손실이 치명적인 용도면 bf16, 손실이 허용 범위이고 처리량/비용이 중요하면 양자화를 택하고, 애매하면 누수를 제거한 같은 평가셋으로 A/B 비교해 에러 유형까지 보고 결정하기로 했습니다.",
+    "source_turns": [
+      51
+    ],
+    "type": "single",
+    "key_facts": [
+      "A/B",
+      "에러 유형"
+    ]
+  },
+  {
+    "question": "다른 사람이 재현할 수 있도록 고정하기로 한 설정들은 무엇이었나요?",
+    "expected": "시드 42(random/numpy/torch/cuda 및 data_seed 포함), 데이터 분할 산출물(dedup·split 결과의 ID/해시) 저장, 라이브러리 버전 핀·베이스 모델 리비전·CUDA/드라이버 버전 등 환경 고정, 그리고 완전 결정성이 필요하면 torch.use_deterministic_algorithms(True)를 고정하기로 했습니다.",
+    "source_turns": [
+      55
+    ],
+    "type": "single",
+    "key_facts": [
+      "42",
+      "data_seed"
+    ]
+  },
+  {
+    "question": "데이터 분할 단계에서 쓴 시드값은 얼마였고, 재현성 확보 단계에서 그 시드를 어떻게 쓰라고 했나요?",
+    "expected": "데이터 분할(split)을 seed=42로 했고, 재현성 단계에서는 그 시드 42를 데이터 분할부터 학습까지(data_seed 포함) 일관되게 쓰라고 했습니다.",
+    "source_turns": [
+      23,
+      55
+    ],
+    "type": "multihop",
+    "key_facts": [
+      "42"
+    ]
   }
 ]
