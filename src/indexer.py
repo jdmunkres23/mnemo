@@ -599,6 +599,36 @@ def summarize_topic(topic_text: str, api_key: str) -> str:
     except Exception:
         return topic_text[:200]
 
+def split_long_topic(session: dict, topic: dict, max_chars: int = CHUNK_SIZE) -> list[dict]:
+    """토픽이 max_chars보다 크면 chunk_session()을 재사용해 여러 조각으로 재분할한다.
+
+    입력:
+      session: {"turns": [...전체 세션...]}
+      topic:    build_topics()가 만든 토픽 하나
+                {"text": str, "turn_start": int, "turn_end": int, "position": int}
+      max_chars: 이 길이 이하면 나누지 않고 [topic] 그대로 반환
+
+    출력:
+      [{"text": str, "turn_start": int, "turn_end": int, "position": int}, ...]
+      turn_start/turn_end는 session 전체 기준 절대 인덱스로 보정되어 있어야 함
+
+    구현 순서:
+    1. len(topic["text"]) <= max_chars 이면 [topic] 그대로 반환
+    2. sub_turns = session["turns"][topic["turn_start"] : topic["turn_end"] + 1]
+    3. chunk_session({"turns": sub_turns}, chunk_size=max_chars) 호출 → raw_chunks
+    4. raw_chunks의 turn_start/turn_end에 topic["turn_start"]를 더해 절대 인덱스로 보정
+    5. 각 조각에 position은 부모 topic["position"] 그대로 부여
+    """
+    if len(topic['text']) <= max_chars:
+        return [topic]
+    sub_turns = session['turns'][topic['turn_start']: topic['turn_end'] + 1]
+    raw_chunks = chunk_session({'turns': sub_turns}, chunk_size=max_chars)
+    for chunk in raw_chunks:
+        chunk['turn_start'] += topic['turn_start']
+        chunk['turn_end'] += topic['turn_start']
+        chunk['position'] = topic['position']
+    return raw_chunks
+    
 
 def build_vector_index(session: dict, session_dir: Path, api_key: str) -> Path:
     """토픽 기반 인덱스를 빌드해 vector_index.json으로 저장한다. (노트북 04-1 섹션 3 참고)
@@ -640,12 +670,19 @@ def build_vector_index(session: dict, session_dir: Path, api_key: str) -> Path:
     session_dir.mkdir(parents=True, exist_ok=True)
     boundaries = detect_topic_boundaries(session, api_key)
     topics = build_topics(session, boundaries)
-    summaries = [summarize_topic(t['text'], api_key) for t in topics]
+
+    entries = []
+    for t in topics:
+        pieces = split_long_topic(session, t)
+        entries.extend(pieces)
+
+    summaries = [summarize_topic(e['text'], api_key) for e in entries]
     embeddings = embed_texts(summaries)
-    for i, topic in enumerate(topics):
-        topic['summary'] = summaries[i]
-        topic['embedding'] = list(embeddings[i])
-    index_path.write_text(json.dumps(topics, ensure_ascii=False), encoding='utf-8')
+    for e, s, emb in zip(entries, summaries, embeddings):
+        e['summary'] = s
+        e['embedding'] = list(emb)
+
+    index_path.write_text(json.dumps(entries, ensure_ascii=False), encoding='utf-8')
     return index_path
 
 
