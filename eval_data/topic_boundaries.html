@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eval_data 토픽 경계 검토</title>
+<style>
+:root {
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-raised: #ffffff;
+  --ink: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+  --border: rgba(11,11,11,0.10);
+  --gridline: #e1e0d9;
+  --accent: #2a78d6;
+  --serious-bg: #fdeee7;
+  --serious-ink: #9a3d17;
+  --serious-icon: #ec835a;
+  --sans: -apple-system, "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-raised: #201f1d;
+    --ink: #ffffff;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+    --border: rgba(255,255,255,0.10);
+    --gridline: #2c2c2a;
+    --accent: #3987e5;
+    --serious-bg: #2c1c14;
+    --serious-ink: #f0a683;
+    --serious-icon: #ec835a;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 56px 24px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+/* header */
+.page-head { display: flex; flex-direction: column; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 32px; }
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+}
+.page-head h1 {
+  font-size: clamp(26px, 3.4vw, 34px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+.page-head p {
+  max-width: 66ch;
+  color: var(--ink-secondary);
+  font-size: 15px;
+  margin: 0;
+}
+.page-head code {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* session section */
+.session { display: flex; flex-direction: column; gap: 20px; }
+.session-head h2 {
+  font-size: 21px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+.session-sub {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 13.5px;
+}
+
+/* stat row */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.stat-tile {
+  background: var(--surface);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stat-value {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.stat-label {
+  font-size: 11.5px;
+  color: var(--ink-muted);
+}
+
+/* strip */
+.strip-wrap { display: flex; flex-direction: column; gap: 10px; }
+.strip-label {
+  font-size: 12px;
+  color: var(--ink-muted);
+  letter-spacing: 0.01em;
+}
+.strip {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.cell {
+  width: 20px;
+  height: 26px;
+  border-radius: 3px;
+  background: var(--c-l);
+  cursor: default;
+  transition: transform 0.1s ease;
+}
+.cell:hover { transform: scaleY(1.15); }
+@media (prefers-color-scheme: dark) { .cell { background: var(--c-d); } }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 2px 2px 0; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-secondary); }
+.swatch { width: 10px; height: 10px; border-radius: 2px; background: var(--c-l); flex: none; }
+@media (prefers-color-scheme: dark) { .swatch { background: var(--c-d); } }
+.legend-num { font-family: var(--mono); color: var(--ink-muted); font-size: 11.5px; }
+
+/* topic cards */
+.cards { display: flex; flex-direction: column; gap: 10px; }
+.topic-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--c-l);
+  border-radius: 8px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+@media (prefers-color-scheme: dark) { .topic-card { border-left-color: var(--c-d); } }
+
+.topic-card-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.topic-badge {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 5px;
+}
+.topic-meta { font-size: 12.5px; color: var(--ink-muted); }
+
+.flag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--serious-bg);
+  color: var(--serious-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 10px;
+  border-radius: 6px;
+  width: fit-content;
+}
+.flag-icon { color: var(--serious-icon); font-size: 11px; }
+
+.topic-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 720px) { .topic-body { grid-template-columns: 1fr; } }
+.col-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.msg-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; }
+.msg-list li { font-size: 13.5px; color: var(--ink); }
+.summary-text { margin: 0; font-size: 13px; color: var(--ink-secondary); }
+
+/* findings */
+.findings {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.findings h2 { font-size: 18px; margin: 0; font-weight: 700; }
+.finding { display: flex; gap: 14px; }
+.finding-num {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink-muted);
+  padding-top: 2px;
+  flex: none;
+  width: 20px;
+}
+.finding-body p { margin: 0; font-size: 14px; color: var(--ink-secondary); }
+.finding-body p + p { margin-top: 6px; }
+.finding-body strong { color: var(--ink); font-weight: 600; }
+.finding-body .mono { font-size: 12.5px; background: var(--surface-raised); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; }
+
+footer.note { color: var(--ink-muted); font-size: 12px; border-top: 1px solid var(--border); padding-top: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-head">
+    <span class="eyebrow">RAG 평가 데이터 · 토픽 경계 검토</span>
+    <h1>eval_data 합성 세션의 벡터 인덱스 토픽 분할</h1>
+    <p>
+      <code>eval-long-001/vector_index.json</code>과 <code>eval-short-001/vector_index.json</code>에 저장된
+      토픽 경계(<span class="mono">turn_start</span>–<span class="mono">turn_end</span>)를 원본 세션 턴에 대응시켜,
+      실제로 몇 개의 사용자 질문이 하나의 토픽으로 묶였는지 시각화했습니다. Phase 4(vector) 방식 기준 인덱스입니다.
+    </p>
+  </div>
+
+  <section class="session">
+    <div class="session-head">
+      <h2>eval-long-001</h2>
+      <p class="session-sub">LoRA 파인튜닝 디버깅 세션 · 58턴 · eval-long-001/vector_index.json</p>
+    </div>
+    <div class="stat-row">
+      <div class="stat-tile"><span class="stat-value">8</span><span class="stat-label">토픽 수</span></div>
+      <div class="stat-tile"><span class="stat-value">29</span><span class="stat-label">Q&amp;A 교환</span></div>
+      <div class="stat-tile"><span class="stat-value">58</span><span class="stat-label">전체 턴</span></div>
+      <div class="stat-tile"><span class="stat-value">2,770자</span><span class="stat-label">토픽당 평균 문자수</span></div>
+      <div class="stat-tile"><span class="stat-value">6,751자</span><span class="stat-label">최대 토픽(#4)</span></div>
+    </div>
+    <div class="strip-wrap">
+      <div class="strip-label">토픽 경계 (칸 1개 = 사용자 질문 1턴, 색 = 토픽)</div>
+      <div class="strip"><div class="cell" style="--c-l:#2a78d6;--c-d:#3987e5" title="토픽 0 · 교환 1/4 · 오픈소스 8B 모델을 우리 데이터로 LoRA 파인튜닝 하려고 해. 어댑터 설정 어떻게 잡지?"></div><div class="cell" style="--c-l:#2a78d6;--c-d:#3987e5" title="토픽 0 · 교환 2/4 · 일단 어텐션만 q/k/v/o로 붙였어. 시퀀스 길이는 얼마로?"></div><div class="cell" style="--c-l:#2a78d6;--c-d:#3987e5" title="토픽 0 · 교환 3/4 · 길이는 2048로 충분해. GPU는 24GB 한 장인데 배치는 어떻게 잡아?"></div><div class="cell" style="--c-l:#2a78d6;--c-d:#3987e5" title="토픽 0 · 교환 4/4 · 유효 배치 32로 갈게. 학습률이랑 스케줄러는?"></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 1/6 · 돌려봤는데 한 50스텝쯤에서 loss가 갑자기 튀더니 NaN 떠."></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 2/6 · fp16 쓰고 있었어. grad_norm도 튀기 직전에 엄청 커졌더라고."></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 3/6 · warmup 0.03, lr 1e-4, bf16으로 바꿨어. 그래디언트 클리핑은 얼마로?"></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 4/6 · 이제 안정적으로 내려가. 근데 학습 중간에 OOM이 났어."></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 5/6 · gradient checkpointing 켜니까 OOM은 안 나. 유효 배치는 그대로 32 유지했고."></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 6/6 · 체크포인트는 어떻게 저장하는 게 좋아?"></div><div class="cell" style="--c-l:#eda100;--c-d:#c98500" title="토픽 2 · 교환 1/3 · 학습 끝났어. 근데 평가셋 정확도가 0.99로 나와. 너무 높은데?"></div><div class="cell" style="--c-l:#eda100;--c-d:#c98500" title="토픽 2 · 교환 2/3 · 겹치는 거 세보니까 진짜 있네. 정규화해서 다시 보니 train/test에 같은 게 꽤 들어갔어."></div><div class="cell" style="--c-l:#eda100;--c-d:#c98500" title="토픽 2 · 교환 3/3 · 교집합이 한 1,800건쯤 됐어. 전체 데이터는 42,000건이고."></div><div class="cell" style="--c-l:#008300;--c-d:#008300" title="토픽 3 · 교환 1/4 · 재분할하고 다시 평가했더니 정확도가 0.86으로 떨어졌어."></div><div class="cell" style="--c-l:#008300;--c-d:#008300" title="토픽 3 · 교환 2/4 · 어 맞아. 생성시켜보면 가끔 답이 중간에 뚝 끊겨. 한두 단어 나오고 끝나."></div><div class="cell" style="--c-l:#008300;--c-d:#008300" title="토픽 3 · 교환 3/4 · 확인해보니 pad_token이 eos_token이랑 같고, 라벨 마스킹도 안 했네."></div><div class="cell" style="--c-l:#008300;--c-d:#008300" title="토픽 3 · 교환 4/4 · 마스킹하고 pad 토큰 분리해서 재학습했어. 이제 생성도 정상이야."></div><div class="cell" style="--c-l:#4a3aa7;--c-d:#9085e9" title="토픽 4 · 교환 1/8 · 서빙하려고 해. 일단 LoRA 어댑터부터 어떻게 배포해?"></div><div class="cell" style="--c-l:#4a3aa7;--c-d:#9085e9" title="토픽 4 · 교환 2/8 · 응 메모리 아끼고 싶어서 4-bit 양자화하려고. 성능 영향 있어?"></div><div class="cell" style="--c-l:#4a3aa7;--c-d:#9085e9" title="토픽 4 · 교환 3/8 · 4-bit nf4로 했고 0.83 확인했어. 이걸로 갈게. 서버는 뭘로 띄워?"></div><div class="cell" style="--c-l:#4a3aa7;--c-d:#9085e9" title="토픽 4 · 교환 4/8 · 8001에 띄웠어. 근데 생성이 멈추질 않고 같은 말을 계속 반복해."></div><div class="cell" style="--c-l:#4a3aa7;--c-d:#9085e9" title="토픽 4 · 교환 5/8 · 템플릿 보니까 학습 때 쓴 포맷이랑 다르고, eos가 템플릿에 안 들어가 있어."></div><div class="cell" style="--c-l:#4a3aa7;--c-d:#9085e9" title="토픽 4 · 교환 6/8 · 템플릿 통일하고 stop 토큰, repetition_penalty 1.1 다 넣었어. 정상이야. 샘플링은 뭘로?"></div><div class="cell" style="--c-l:#4a3aa7;--c-d:#9085e9" title="토픽 4 · 교환 7/8 · 평가용은 temp 낮춰볼게. 그런데 응답 지연이 좀 길어. 어떻게 줄이지?"></div><div class="cell" style="--c-l:#4a3aa7;--c-d:#9085e9" title="토픽 4 · 교환 8/8 · 실제 요청은 2048 안에 다 들어와. 그럼 줄일게."></div><div class="cell" style="--c-l:#e34948;--c-d:#e66767" title="토픽 5 · 교환 1/1 · 지연 줄었어. 근데 아까 4-bit 양자화하면서 정확도가 좀 떨어졌잖아. bf16이랑 다시 비교해봐야 하나?"></div><div class="cell" style="--c-l:#e87ba4;--c-d:#d55181" title="토픽 6 · 교환 1/1 · 정리하면 지금 전체 구성이 어떻게 되는 거야? 한 번 짚어줘."></div><div class="cell" style="--c-l:#eb6834;--c-d:#d95926" title="토픽 7 · 교환 1/2 · 좋아. 이걸 다른 사람도 재현할 수 있게 하려면 뭘 고정해야 해?"></div><div class="cell" style="--c-l:#eb6834;--c-d:#d95926" title="토픽 7 · 교환 2/2 · 좋아. 다 정리됐다. 고마워."></div></div>
+      <div class="legend"><div class="legend-item"><span class="swatch" style="--c-l:#2a78d6;--c-d:#3987e5"></span><span class="legend-num">0</span><span class="legend-label">LoRA 파인튜닝에서 8B 모델을 사용하…</span></div><div class="legend-item"><span class="swatch" style="--c-l:#1baf7a;--c-d:#199e70"></span><span class="legend-num">1</span><span class="legend-label">사용자가 LoRA 학습중 NaN 문제가…</span></div><div class="legend-item"><span class="swatch" style="--c-l:#eda100;--c-d:#c98500"></span><span class="legend-num">2</span><span class="legend-label">사용자는 학습이 끝났고 평가셋 정확도가…</span></div><div class="legend-item"><span class="swatch" style="--c-l:#008300;--c-d:#008300"></span><span class="legend-num">3</span><span class="legend-label">사용자는 모델을 재분할하고 다시 평가한…</span></div><div class="legend-item"><span class="swatch" style="--c-l:#4a3aa7;--c-d:#9085e9"></span><span class="legend-num">4</span><span class="legend-label">사용자는 LoRA 어댑터를 사용할 때 서…</span></div><div class="legend-item"><span class="swatch" style="--c-l:#e34948;--c-d:#e66767"></span><span class="legend-num">5</span><span class="legend-label">사용자는 자신의 모델의 정확성이 떨어진…</span></div><div class="legend-item"><span class="swatch" style="--c-l:#e87ba4;--c-d:#d55181"></span><span class="legend-num">6</span><span class="legend-label">요약:</span></div><div class="legend-item"><span class="swatch" style="--c-l:#eb6834;--c-d:#d95926"></span><span class="legend-num">7</span><span class="legend-label">다음은 대화의 핵심 요약입니다</span></div></div>
+    </div>
+    <div class="cards">
+      <article class="topic-card" style="--c-l:#2a78d6;--c-d:#3987e5">
+        <div class="topic-card-head">
+          <span class="topic-badge">토픽 0</span>
+          <span class="topic-meta">턴 0–7 · 교환 4회 · <span class="mono">2,766자</span></span>
+        </div>
+        <div class="topic-body">
+          <div class="topic-col">
+            <div class="col-label">사용자 질문 (4)</div>
+            <ul class="msg-list"><li>오픈소스 8B 모델을 우리 데이터로 LoRA 파인튜닝 하려고 해. 어댑터 설정 어떻게 잡지?</li><li>일단 어텐션만 q/k/v/o로 붙였어. 시퀀스 길이는 얼마로?</li><li>길이는 2048로 충분해. GPU는 24GB 한 장인데 배치는 어떻게 잡아?</li><li>유효 배치 32로 갈게. 학습률이랑 스케줄러는?</li></ul>
+          </div>
+          <div class="topic-col">
+            <div class="col-label">인덱스 요약 (summary)</div>
+            <p class="summary-text">LoRA 파인튜닝에서 8B 모델을 사용하기 위해 어댑터 설정과 학습 설정을 다음과 같이 잡아보자:<br><br>```python<br># 어댑터 설정<br>from peft import LoraConfig<br>lora_config = LoraConfig(<br>&nbsp;&nbsp;&nbsp;&nbsp;r=16,&nbsp;&nbsp;# rank<br>&nbsp;&nbsp;&nbsp;&nbsp;lora_alpha=32,&nbsp;&nbsp;# alpha (보통 r의 2배)<br>&nbsp;&nbsp;&nbsp;&nbsp;lora_dropout=0.05,<br>&nbsp;&nbsp;&nbsp;&nbsp;target_modules=[&quot;q_proj&quot;, &quot;k_proj&quot;, &quot;v_proj&quot;, &quot;o_proj&quot;],<br>&nbsp;&nbsp;&nbsp;&nbsp;task_type=&quot;CAUSAL_LM&quot;,<br>)<br><br># 학습 설정<br>max_seq_len = 2048&nbsp;&nbsp;# 시퀀스 길이<br>per_device_train_batch_size = 4&nbsp;&nbsp;# GPU에 올리는 실제 샘플 수<br>gradient_accumulation_steps&nbsp;&nbsp;= 8&nbsp;&nbsp;# 그래디언트 누적<br>learning_rate = 2e-4&nbsp;&nbsp;# 초기 학습률<br>lr_scheduler_type = &quot;cosine&quot;&nbsp;&nbsp;# cosine 스케줄러<br>num_train_epochs = 3&nbsp;&nbsp;# 에폭 수<br>```<br><br>이 설정은 어텐션 projection 레이어에 저랭크 어댑터를 붙이게</p>
+          </div>
+        </div>
+      </article>
+      <article class="topic-card" style="--c-l:#1baf7a;--c-d:#199e70">
+        <div class="topic-card-head">
+          <span class="topic-badge">토픽 1</span>
+          <span class="topic-meta">턴 8–19 · 교환 6회 · <span class="mono">4,292자</span></span>
+        </div>
+        <div class="topic-body">
+          <div class="topic-col">
+            <div class="col-label">사용자 질문 (6)</div>
+            <ul class="msg-list"><li>돌려봤는데 한 50스텝쯤에서 loss가 갑자기 튀더니 NaN 떠.</li><li>fp16 쓰고 있었어. grad_norm도 튀기 직전에 엄청 커졌더라고.</li><li>warmup 0.03, lr 1e-4, bf16으로 바꿨어. 그래디언트 클리핑은 얼마로?</li><li>이제 안정적으로 내려가. 근데 학습 중간에 OOM이 났어.</li><li>gradient checkpointing 켜니까 OOM은 안 나. 유효 배치는 그대로 32 유지했고.</li><li>체크포인트는 어떻게 저장하는 게 좋아?</li></ul>
+          </div>
+          <div class="topic-col">
+            <div class="col-label">인덱스 요약 (summary)</div>
+            <p class="summary-text">사용자가 LoRA 학습중 NaN 문제가 발생하여 학습이 중단되었습니다. AI가 해결책을 제시하며, 학습률 낮추기, fp16 대신 bf16 사용, 그래디언트 클리핑 max_grad_norm 1.0, 학습 중간에 OOM 발생으로 학습이 중단되었습니다. AI가 gradient_checkpointing와 bf16로 메모리 문제를 해결하였습니다.</p>
+          </div>
+        </div>
+      </article>
+      <article class="topic-card" style="--c-l:#eda100;--c-d:#c98500">
+        <div class="topic-card-head">
+          <span class="topic-badge">토픽 2</span>
+          <span class="topic-meta">턴 20–25 · 교환 3회 · <span class="mono">2,355자</span></span>
+        </div>
+        <div class="topic-body">
+          <div class="topic-col">
+            <div class="col-label">사용자 질문 (3)</div>
+            <ul class="msg-list"><li>학습 끝났어. 근데 평가셋 정확도가 0.99로 나와. 너무 높은데?</li><li>겹치는 거 세보니까 진짜 있네. 정규화해서 다시 보니 train/test에 같은 게 꽤 들어갔어.</li><li>교집합이 한 1,800건쯤 됐어. 전체 데이터는 42,000건이고.</li></ul>
+          </div>
+          <div class="topic-col">
+            <div class="col-label">인덱스 요약 (summary)</div>
+            <p class="summary-text">사용자는 학습이 끝났고 평가셋 정확도가 0.99로 매우 높은 것에 대해 문의한다. AI는 이것이 데이터 누수(data leakage)로 인한 것일 수 있으며, 가장 흔한 원인 3가지를 설명한다: 데이터의 train/test 중복, 분할 순서의 문제 및 피처의 누수성.<br><br>사용자가 문제를 재생산하기 위해 교집합을 세어본 후, AI는 문제를 다시 확인하고, 중복 제거 후의 훈련/테스트 분할을 변경하는 것이 필요하다고 말한다. 또한 데이터 정규화와 해시 함수를 사용하여 중복을 피하기 위한 dedup FIRST의 중요성을 강조한다.<br><br>사용자는 교집합이 1,800 건 정도라고 보고받으며, AI는 이것이 훈련 데이터의 4.3%를 차지한다고 설명한다. 이후 AI는 분할 후 교집합이 0인지 확인하는 작업을 명령한다.</p>
+          </div>
+        </div>
+      </article>
+      <article class="topic-card" style="--c-l:#008300;--c-d:#008300">
+        <div class="topic-card-head">
+          <span class="topic-badge">토픽 3</span>
+          <span class="topic-meta">턴 26–33 · 교환 4회 · <span class="mono">3,131자</span></span>
+        </div>
+        <div class="topic-body">
+          <div class="topic-col">
+            <div class="col-label">사용자 질문 (4)</div>
+            <ul class="msg-list"><li>재분할하고 다시 평가했더니 정확도가 0.86으로 떨어졌어.</li><li>어 맞아. 생성시켜보면 가끔 답이 중간에 뚝 끊겨. 한두 단어 나오고 끝나.</li><li>확인해보니 pad_token이 eos_token이랑 같고, 라벨 마스킹도 안 했네.</li><li>마스킹하고 pad 토큰 분리해서 재학습했어. 이제 생성도 정상이야.</li></ul>
+          </div>
+          <div class="topic-col">
+            <div class="col-label">인덱스 요약 (summary)</div>
+            <p class="summary-text">사용자는 모델을 재분할하고 다시 평가한 결과 정확도가 0.86으로 떨어졌다고 보고했다. AI는 0.86이 실제 성능으로 생각하고 그보다 높은 정확도인 0.99는 누수로 인해 달아나는 신기루라고 설명했다.<br><br>사용자가 모델이 생성 중간에 일찍 끝나거나 답이 짧게 잘리는 문제가 있다고 보고하면 AI는 패딩/EOS 토큰 처리 문제가 있을 가능성이 높다고 설명하고, pad_token이 eos_token과 같게 설정되었거나 label 마스킹이 안된 경우가 이를 유발한다고 말한다. <br><br>이 문제를 해결하기 위해 AI는 label에 패딩 위치에 -100로 마스킹하거나, 패딩 토큰을 eos와 분리하는 두 가지 해결책을 제시한다. 이 두 가지를 적용하여 데이터를 다시 토크나이즈해서 재학습하면 생성이 정상적인 길이로 끝까지나올 것으로 예상된다.</p>
+          </div>
+        </div>
+      </article>
+      <article class="topic-card" style="--c-l:#4a3aa7;--c-d:#9085e9">
+        <div class="topic-card-head">
+          <span class="topic-badge">토픽 4</span>
+          <span class="topic-meta">턴 34–49 · 교환 8회 · <span class="mono">6,751자</span></span>
+        </div>
+        <div class="flag"><span class="flag-icon">&#9650;</span><span>대용량 토픽 — 여러 사실이 하나로 뭉쳐 요약 시 희석될 가능성</span></div>
+        <div class="topic-body">
+          <div class="topic-col">
+            <div class="col-label">사용자 질문 (8)</div>
+            <ul class="msg-list"><li>서빙하려고 해. 일단 LoRA 어댑터부터 어떻게 배포해?</li><li>응 메모리 아끼고 싶어서 4-bit 양자화하려고. 성능 영향 있어?</li><li>4-bit nf4로 했고 0.83 확인했어. 이걸로 갈게. 서버는 뭘로 띄워?</li><li>8001에 띄웠어. 근데 생성이 멈추질 않고 같은 말을 계속 반복해.</li><li>템플릿 보니까 학습 때 쓴 포맷이랑 다르고, eos가 템플릿에 안 들어가 있어.</li><li>템플릿 통일하고 stop 토큰, repetition_penalty 1.1 다 넣었어. 정상이야. 샘플링은 뭘로?</li><li>평가용은 temp 낮춰볼게. 그런데 응답 지연이 좀 길어. 어떻게 줄이지?</li><li>실제 요청은 2048 안에 다 들어와. 그럼 줄일게.</li></ul>
+          </div>
+          <div class="topic-col">
+            <div class="col-label">인덱스 요약 (summary)</div>
+            <p class="summary-text">사용자는 LoRA 어댑터를 사용할 때 서빙 방법에 대해 묻고, AI는 두 가지 방법(병합과 동적 로딩)을 설명한다. 사용자는 4-bit 양자화를 택하고, AI는 양자화의 결과와 vLLM의 사용법을 설명한다. 사용자는 vLLM으로 서비스를 띄웠지만, 생성이 멈추지 않고 같은 말을 반복하는데, AI는(stop 토큰/채팅 템플릿 문제)가 원인일 수 있다고 설명하고, 해결 방법을 제시한다.</p>
+          </div>
+        </div>
+      </article>
+      <article class="topic-card" style="--c-l:#e34948;--c-d:#e66767">
+        <div class="topic-card-head">
+          <span class="topic-badge">토픽 5</span>
+          <span class="topic-meta">턴 50–51 · 교환 1회 · <span class="mono">793자</span></span>
+        </div>
+        <div class="topic-body">
+          <div class="topic-col">
+            <div class="col-label">사용자 질문 (1)</div>
+            <ul class="msg-list"><li>지연 줄었어. 근데 아까 4-bit 양자화하면서 정확도가 좀 떨어졌잖아. bf16이랑 다시 비교해봐야 하나?</li></ul>
+          </div>
+          <div class="topic-col">
+            <div class="col-label">인덱스 요약 (summary)</div>
+            <p class="summary-text">사용자는 자신의 모델의 정확성이 떨어진 후 bf16과 다시 비교할 것인지 궁금해합니다. AI는 양자화 버전과 비양자화 버전을 실제 서빙 조건에서 한 번 더 비교해볼 것을 권장합니다. 비교 기준을 정리하면:<br><br>- 정확도: 양자화 버전은 조금 낮음, bf16 버전은 더 높음<br>- 메모리 사용: 양자화 버전이 크게 절감, bf16 버전이 많이 사용<br>- 처리량: 양자화 버전이 메모리 여유가 큼, bf16 버전이 품질이 업, 메모리 부담이 업<br><br>판단 기준을 세우면 다음과 같습니다:<br>- 정확도 손실이 치명적인 용도면 bf16 버전을 선택<br>- 손실이 허용 범위이고 처리량/비용이 중요하면 양자화를 유지<br>- 애매한 경우 두 버전을 A/B 테스트하여 에러 유형을 확인합니다.</p>
+          </div>
+        </div>
+      </article>
+      <article class="topic-card" style="--c-l:#e87ba4;--c-d:#d55181">
+        <div class="topic-card-head">
+          <span class="topic-badge">토픽 6</span>
+          <span class="topic-meta">턴 52–53 · 교환 1회 · <span class="mono">573자</span></span>
+        </div>
+        <div class="topic-body">
+          <div class="topic-col">
+            <div class="col-label">사용자 질문 (1)</div>
+            <ul class="msg-list"><li>정리하면 지금 전체 구성이 어떻게 되는 거야? 한 번 짚어줘.</li></ul>
+          </div>
+          <div class="topic-col">
+            <div class="col-label">인덱스 요약 (summary)</div>
+            <p class="summary-text">요약:<br><br> AI는 네 단계로 구성된 구조를 설명하는데, 각 단계는 다음과 같다: 수집·학습, 안정화, 데이터·평가, 서빙. 각 단계는 서로 영향을 주고받으며, 각 단계에서 정했던 설정값에 따라 현재 일관된 상태를 유지하고 있다.</p>
+          </div>
+        </div>
+      </article>
+      <article class="topic-card" style="--c-l:#eb6834;--c-d:#d95926">
+        <div class="topic-card-head">
+          <span class="topic-badge">토픽 7</span>
+          <span class="topic-meta">턴 54–57 · 교환 2회 · <span class="mono">1,500자</span></span>
+        </div>
+        <div class="topic-body">
+          <div class="topic-col">
+            <div class="col-label">사용자 질문 (2)</div>
+            <ul class="msg-list"><li>좋아. 이걸 다른 사람도 재현할 수 있게 하려면 뭘 고정해야 해?</li><li>좋아. 다 정리됐다. 고마워.</li></ul>
+          </div>
+          <div class="topic-col">
+            <div class="col-label">인덱스 요약 (summary)</div>
+            <p class="summary-text">다음은 대화의 핵심 요약입니다.<br><br>재현성은 무작위성 고정, 환경 고정, 데이터 분할 고정 세 축으로 구성됩니다. 1) 시드 고정, 2) 데이터 분할 산출물 저장, 3) 환경 고정, 그리고 4) 완전 결정성이 필요하면 이러한 설정을 통해 비슷한 증상이 나오더라도 원인을 찾는 데 도움이 됩니다.</p>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="session">
+    <div class="session-head">
+      <h2>eval-short-001</h2>
+      <p class="session-sub">SaaS DCF 가치평가 세션 · 22턴 · eval-short-001/vector_index.json</p>
+    </div>
+    <div class="stat-row">
+      <div class="stat-tile"><span class="stat-value">2</span><span class="stat-label">토픽 수</span></div>
+      <div class="stat-tile"><span class="stat-value">11</span><span class="stat-label">Q&amp;A 교환</span></div>
+      <div class="stat-tile"><span class="stat-value">22</span><span class="stat-label">전체 턴</span></div>
+      <div class="stat-tile"><span class="stat-value">3,316자</span><span class="stat-label">토픽당 평균 문자수</span></div>
+      <div class="stat-tile"><span class="stat-value">4,319자</span><span class="stat-label">최대 토픽(#1)</span></div>
+    </div>
+    <div class="strip-wrap">
+      <div class="strip-label">토픽 경계 (칸 1개 = 사용자 질문 1턴, 색 = 토픽)</div>
+      <div class="strip"><div class="cell" style="--c-l:#2a78d6;--c-d:#3987e5" title="토픽 0 · 교환 1/4 · SaaS 회사 하나를 DCF로 가치평가 해보려고 해. 기준연도 매출이 120억이고 앞으로 5년 예측할 건데, 성장률은 어떻게 깔지?"></div><div class="cell" style="--c-l:#2a78d6;--c-d:#3987e5" title="토픽 0 · 교환 2/4 · 성장률은 1~3년 35%, 4~5년 20%로 하자. 마진은 어떻게 잡아?"></div><div class="cell" style="--c-l:#2a78d6;--c-d:#3987e5" title="토픽 0 · 교환 3/4 · 법인세는 22%로 잡을게. 그럼 잉여현금흐름(FCF)은 어떻게 정의해?"></div><div class="cell" style="--c-l:#2a78d6;--c-d:#3987e5" title="토픽 0 · 교환 4/4 · 할인율은 WACC 쓰면 되지? 얼마로 잡아?"></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 1/7 · 어 잠깐, 1년차 현금흐름을 할인했는데 값이 좀 큰 것 같아. (1+WACC)^0으로 나눴거든."></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 2/7 · t를 1부터로 고쳤어. 근데 mid-year convention은 뭐야? 그건 써야 하나?"></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 3/7 · 알겠어, 일단 연말 기준으로 둘게. 터미널 밸류는 5년 뒤를 어떻게 구해?"></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 4/7 · 영구성장률 2.5%는 어떻게 정한 거야?"></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 5/7 · 좋아. 그럼 기업가치(EV)가 나왔으면 주주가치는 어떻게 가? 이 회사 순현금이 30억 있어."></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 6/7 · 순현금 30억은 전액 잉여로 봐도 돼. 주식수가 1,000만주인데 주당가치는?"></div><div class="cell" style="--c-l:#1baf7a;--c-d:#199e70" title="토픽 1 · 교환 7/7 · 마지막으로, WACC가 틀리면 가치가 얼마나 민감해?"></div></div>
+      <div class="legend"><div class="legend-item"><span class="swatch" style="--c-l:#2a78d6;--c-d:#3987e5"></span><span class="legend-num">0</span><span class="legend-label">사용자는 SaaS 회사를 DCF로 가치평…</span></div><div class="legend-item"><span class="swatch" style="--c-l:#1baf7a;--c-d:#199e70"></span><span class="legend-num">1</span><span class="legend-label">사용자는 1년차 현금흐름을 할인할 때 t…</span></div></div>
+    </div>
+    <div class="cards">
+      <article class="topic-card" style="--c-l:#2a78d6;--c-d:#3987e5">
+        <div class="topic-card-head">
+          <span class="topic-badge">토픽 0</span>
+          <span class="topic-meta">턴 0–7 · 교환 4회 · <span class="mono">2,313자</span></span>
+        </div>
+        <div class="topic-body">
+          <div class="topic-col">
+            <div class="col-label">사용자 질문 (4)</div>
+            <ul class="msg-list"><li>SaaS 회사 하나를 DCF로 가치평가 해보려고 해. 기준연도 매출이 120억이고 앞으로 5년 예측할 건데, 성장률은 어떻게 깔지?</li><li>성장률은 1~3년 35%, 4~5년 20%로 하자. 마진은 어떻게 잡아?</li><li>법인세는 22%로 잡을게. 그럼 잉여현금흐름(FCF)은 어떻게 정의해?</li><li>할인율은 WACC 쓰면 되지? 얼마로 잡아?</li></ul>
+          </div>
+          <div class="topic-col">
+            <div class="col-label">인덱스 요약 (summary)</div>
+            <p class="summary-text">사용자는 SaaS 회사를 DCF로 가치평가 하려고 한다. AI는 다음과 같이 제안한다.<br><br>- 기준연도(Year 0) 매출은 120억이며, 5년 명시적 예측 기간(explicit forecast)을 두고 성장률은 다음과 같이 제안한다.<br>&nbsp;- 1~3년차: 연 35%<br>&nbsp;- 4~5년차: 연 20%<br><br>또한, EBIT 마진은 현재 18%에서 5년차 25%로 점진 개선한다.<br><br>법인세율은 22%로 잡고 잉여현금흐름(FCF)은 다음과 같이 정의한다.<br><br>FCF = NOPAT + 감가상각(D&amp;A) − 자본적지출(Capex) − 순운전자본 증가분(ΔNWC)<br><br>무차입 잉여현금흐름(unlevered FCF)이다.<br><br>할인율은 WACC를 사용하며, WACC는 11.5%로 잡는다.</p>
+          </div>
+        </div>
+      </article>
+      <article class="topic-card" style="--c-l:#1baf7a;--c-d:#199e70">
+        <div class="topic-card-head">
+          <span class="topic-badge">토픽 1</span>
+          <span class="topic-meta">턴 8–21 · 교환 7회 · <span class="mono">4,319자</span></span>
+        </div>
+        <div class="flag"><span class="flag-icon">&#9650;</span><span>대용량 토픽 — 서로 다른 7개 개념이 하나의 요약으로 압축</span></div>
+        <div class="topic-body">
+          <div class="topic-col">
+            <div class="col-label">사용자 질문 (7)</div>
+            <ul class="msg-list"><li>어 잠깐, 1년차 현금흐름을 할인했는데 값이 좀 큰 것 같아. (1+WACC)^0으로 나눴거든.</li><li>t를 1부터로 고쳤어. 근데 mid-year convention은 뭐야? 그건 써야 하나?</li><li>알겠어, 일단 연말 기준으로 둘게. 터미널 밸류는 5년 뒤를 어떻게 구해?</li><li>영구성장률 2.5%는 어떻게 정한 거야?</li><li>좋아. 그럼 기업가치(EV)가 나왔으면 주주가치는 어떻게 가? 이 회사 순현금이 30억 있어.</li><li>순현금 30억은 전액 잉여로 봐도 돼. 주식수가 1,000만주인데 주당가치는?</li><li>마지막으로, WACC가 틀리면 가치가 얼마나 민감해?</li></ul>
+          </div>
+          <div class="topic-col">
+            <div class="col-label">인덱스 요약 (summary)</div>
+            <p class="summary-text">사용자는 1년차 현금흐름을 할인할 때 t를 1부터로 고쳤는데 왜 그런지 물어보았습니다. AI는 이를 할인 시점 off-by-one 실수라고 설명했고, 현실 세계에서는 매출/현금이 연중간에 들어오는 것처럼 가정을 반영하고, 연중 할인(mid-year convention)으로 할인 지수를 0.5씩 당겨주는 것을 추천했습니다.<br><br>사용자는 현재가치를 계산하기위해 가중 할인율(WACC)와 영구성장률(g)도 조정하는 과정에서 어려움을 겪었는데, 가중 할인율(WACC)을 정할 때는 기업의 부채와 차입금 조사를 통해 정확한 값을 계산하는 것이 중요하고, 영구성장률(g)도 1.5~3% 범위에서 조정하는 것이 보다 현실적인 값을 얻을 수 있는 방법이라고 답변했습니다.<br><br>사용자는 기업가치(EV)가 나왔으면 주주가치를 계산하는 과정을 물어보고, 순부채 조정을 통해서 기업가치(EV)를 주주가치로</p>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <div class="findings">
+    <h2>확인된 사항</h2>
+    <div class="finding">
+      <span class="finding-num">01</span>
+      <div class="finding-body">
+        <p><strong>eval-long-001 토픽 4의 문자수(6,751자)는 CLAUDE.md Phase 5 섹션에 근거로 언급된 예시와 정확히 일치합니다.</strong>
+        "토픽 하나에 여러 사실이 뭉치고(예: 6751자/6개 사실짜리 토픽)"라는 문서 서술이 실제로 이 데이터셋의 토픽 4
+        (서빙 배포 — 병합, 양자화, vLLM 설정, 무한 생성 버그까지 8번의 서로 다른 질문/답변)를 가리키고 있습니다.</p>
+      </div>
+    </div>
+    <div class="finding">
+      <span class="finding-num">02</span>
+      <div class="finding-body">
+        <p><strong>eval-short-001은 토픽이 단 2개뿐이며, 토픽 1이 전체 22턴 중 14턴(64%)을 차지합니다.</strong>
+        off-by-one 할인 오류, mid-year convention, 터미널 밸류, 영구성장률 근거, EV→주주가치 환산, 주당가치,
+        WACC 민감도까지 서로 구분되는 7개의 질문이 <span class="mono">4,319자</span> 토픽 하나의 요약(2~3문장)으로
+        압축되어 있어, 짧은 대화에서도 같은 희석 문제가 나타날 수 있음을 보여줍니다.</p>
+      </div>
+    </div>
+    <div class="finding">
+      <span class="finding-num">03</span>
+      <div class="finding-body">
+        <p>eval-long-001은 앞부분(토픽 0~3)은 4~6개 교환 단위로 비교적 세밀하게 나뉘지만, 뒷부분(토픽 5~7)은
+        1~2개 교환마다 경계가 생겨 오히려 지나치게 잘게 쪼개져 있습니다 — 같은 세션 안에서도 경계 탐지 결과가
+        균일하지 않습니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="note">
+    데이터 출처: eval_data/eval-long-001/vector_index.json, eval_data/eval-short-001/vector_index.json ·
+    원본 세션: eval_data/eval-long-001.session.json, eval_data/eval-short-001.session.json
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,1030 @@
+{
+  "baseline": [
+    {
+      "question": "LoRA 어댑터의 rank와 alpha를 각각 얼마로 잡았나요?",
+      "expected": "rank 16, alpha 32로 잡았습니다.",
+      "answer": "LoRA 어댑터의 하이퍼파라미터는 다음과 같이 설정되었습니다.\n\n*   **rank $r=16$**: 어댑터 용량. 작으면 학습이 덜 되고, 크면 파라미터·메모리가 늘어납니다. 16이 무난한 출발점입니다.\n*   **alpha=32**: 스케일링 계수. 실효 학습 강도는 $alpha/r = 2.0$이 됩니다. 보통 alpha를 r의 2배로 두는 관례를 따랐습니다.",
+      "usage": {
+        "queue_time": 2.761519963,
+        "prompt_tokens": 2451,
+        "prompt_time": 0.126194363,
+        "completion_tokens": 114,
+        "completion_time": 0.25767249,
+        "total_tokens": 2565,
+        "total_time": 0.383866853
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        1
+      ],
+      "key_facts": [
+        "16",
+        "32"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "학습 시 최대 시퀀스 길이를 얼마로 설정했나요?",
+      "expected": "max_seq_len 2048로 설정했습니다.",
+      "answer": "2048로 설정했습니다.",
+      "usage": {
+        "queue_time": 0.006031319,
+        "prompt_tokens": 2393,
+        "prompt_time": 0.095926528,
+        "completion_tokens": 7,
+        "completion_time": 0.015817494,
+        "total_tokens": 2400,
+        "total_time": 0.111744022
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        3
+      ],
+      "key_facts": [
+        "2048"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "per-device 배치와 그래디언트 누적을 곱한 유효 배치 크기는 얼마였나요?",
+      "expected": "32입니다 (per_device 4 × grad_accum 8).",
+      "answer": "per-device 배치와 그래디언트 누적을 곱한 유효 배치 크기는 **32**입니다.\n\n*   per-device 배치: 4\n*   그래디언트 누적: 8\n\n따라서 유효 배치 크기 = 4 × 8 = **32**",
+      "usage": {
+        "queue_time": 0.005861368,
+        "prompt_tokens": 2365,
+        "prompt_time": 0.095052902,
+        "completion_tokens": 58,
+        "completion_time": 0.132364185,
+        "total_tokens": 2423,
+        "total_time": 0.227417087
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        5
+      ],
+      "key_facts": [
+        "32"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "처음에 설정한 학습률과 스케줄러 종류는 무엇이었나요?",
+      "expected": "학습률 2e-4, cosine 스케줄러로 시작했습니다.",
+      "answer": "학습률은 **2e-4** 였고, 스케줄러 종류는 **cosine** 이었습니다.",
+      "usage": {
+        "queue_time": 0.400771781,
+        "prompt_tokens": 2384,
+        "prompt_time": 0.103413472,
+        "completion_tokens": 26,
+        "completion_time": 0.058779472,
+        "total_tokens": 2410,
+        "total_time": 0.162192944
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        7
+      ],
+      "key_facts": [
+        "2e-4",
+        "cosine"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "학습 손실이 초반에 튀어(spike) NaN이 난 원인과, 그걸 잡으려고 조정한 설정들은 무엇이었나요?",
+      "expected": "초기 학습률이 높고 warmup이 없던 게 원인이며, warmup_ratio 0.03 + 학습률 1e-4 하향 + bf16 전환 + max_grad_norm 1.0 클리핑으로 잡았습니다.",
+      "answer": "학습 손실이 초반에 튀어 NaN이 발생한 원인은 그래디언트가 통제 불능으로 커졌기 때문입니다. 이는 fp16의 표현 범위가 좁아 큰 값에서 쉽게 NaN으로 터지기 때문입니다.\n\n이를 해결하기 위해 다음과 같은 설정들을 조정했습니다.\n\n1. **warmup 추가**: 초반에 학습률을 0부터 천천히 올리기 위해 warmup을 추가했습니다. 전체 스텝의 3%를 warmup으로 설정했습니다.\n2. **학습률 하향**: 학습률을 2e-4에서 1e-4로 하향 조정했습니다.\n3. **bf16으로 전환**: fp16 대신 bf16을 사용했습니다. bf16은 표현 범위가 넓어 큰 그래디언트에도 NaN이 잘 안 납니다.\n\n또한, 그래디언트 클리핑을 위해 **max_grad_norm = 1.0**을 설정했습니다. 이는 그래디언트의 norm을 계산하여 임계값(1.0)을 넘으면 비율을 유지한 채 1.0으로 축소합니다.",
+      "usage": {
+        "queue_time": 0.34021364,
+        "prompt_tokens": 2365,
+        "prompt_time": 0.095714582,
+        "completion_tokens": 226,
+        "completion_time": 0.511978926,
+        "total_tokens": 2591,
+        "total_time": 0.607693508
+      },
+      "hit": 0.6666666666666666,
+      "type": "multihop",
+      "source_turns": [
+        9,
+        11,
+        13
+      ],
+      "key_facts": [
+        "0.03",
+        "1e-4",
+        "bf16",
+        "1.0"
+      ],
+      "keyfact_score": 0.75
+    },
+    {
+      "question": "학습 중 OOM을 해결하려고 켠 설정은 무엇이었나요?",
+      "expected": "gradient_checkpointing을 켰습니다(bf16과 함께).",
+      "answer": "gradient_checkpointing과 bf16입니다. \n\n* gradient_checkpointing은 backward 때 필요한 활성화를 다시 계산하는 대신 메모리에 모든 중간 활성화를 저장하지 않아 메모리를 크게 절약할 수 있습니다. 대신 연산이 더 필요합니다. \n* bf16은 메모리 사용을 줄이면서도 모델의 정확도를 유지하는 데 도움이 됩니다. 특히 NaN을 방지하기 위해 이미 켜져 있었습니다. \n\n두 설정을 통해 메모리를 절약하여 OOM을 해결할 수 있었습니다.",
+      "usage": {
+        "queue_time": 0.617290451,
+        "prompt_tokens": 2044,
+        "prompt_time": 0.096565427,
+        "completion_tokens": 104,
+        "completion_time": 0.236690113,
+        "total_tokens": 2148,
+        "total_time": 0.33325554
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        15
+      ],
+      "key_facts": [
+        "gradient_checkpointing"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "평가 정확도가 0.99로 비정상적으로 높았던 원인과 그 처리 방법은 무엇이었나요?",
+      "expected": "train/test 데이터 누수(중복 샘플)가 원인이며, 정규화 후 sha1로 중복 제거한 다음 분할하도록 순서를 바꿔 해결했습니다.",
+      "answer": "평가 정확도가 0.99로 비정상적으로 높았던 원인은 **데이터 누수(data leakage)** 였습니다. 즉, 모델이 평가셋의 일부 데이터를 학습 과정에서 이미 본 적이 있었기 때문에 정확도가 비정상적으로 높게 나온 것이었습니다.\n\n구체적으로는, **학습 데이터와 평가 데이터에 중복되는 샘플이 존재**했습니다. 이는 데이터 분할을 중복 제거 전에 수행하여 동일한 샘플의 복제본이 학습 데이터와 평가 데이터로 나누어진 결과였습니다.\n\n이를 처리하기 위해 **중복 제거(dedup)**를 먼저 수행하고, 그 후에 데이터를 분할하는 순서로 바꿨습니다. 이렇게 하면 평가 데이터와 학습 데이터에 중복되는 샘플이 없어지게 되어, 모델의 성능을 정확하게 평가할 수 있습니다.\n\n결과적으로, 중복 제거와 재분할 후에 모델을 다시 평가한 결과, 정확도는 **0.86**으로 떨어졌습니다. 이는 신뢰할 수 있는 성능 수치이며, 실제 모델의 성능을 반영하는 값입니다.",
+      "usage": {
+        "queue_time": 1.5691961079999999,
+        "prompt_tokens": 2187,
+        "prompt_time": 0.111842438,
+        "completion_tokens": 210,
+        "completion_time": 0.474962952,
+        "total_tokens": 2397,
+        "total_time": 0.58680539
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        21,
+        23,
+        25
+      ],
+      "key_facts": [
+        "누수",
+        "sha1"
+      ],
+      "keyfact_score": 0.5
+    },
+    {
+      "question": "중복 제거는 무엇을 기준으로 했고, 데이터 누수로 몇 건 정도가 새어 있었나요?",
+      "expected": "정규화한 텍스트의 sha1 해시를 기준으로 했고, 약 1,800건이 train/test에 겹쳐 있었습니다.",
+      "answer": "1. **중복 제거 기준**: 정규화 후 sha1 해시로 중복 판정 — 공백·대소문자 정규화 후 텍스트의 sha1 해시를 구하여 중복을 제거했습니다.\n\n2. **데이터 누수 규모**: 1,800건 정도가 새어 있었습니다. (전체 42,000건 중 1,800건이 중복되어 평가셋의 약 40%가 \"이미 본 문제\"였던 것으로 추정됩니다.)",
+      "usage": {
+        "queue_time": 0.084801647,
+        "prompt_tokens": 2186,
+        "prompt_time": 0.095143801,
+        "completion_tokens": 94,
+        "completion_time": 0.212722936,
+        "total_tokens": 2280,
+        "total_time": 0.307866737
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        23,
+        25
+      ],
+      "key_facts": [
+        "sha1",
+        "1800"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "전체 데이터셋 규모는 몇 건이었나요?",
+      "expected": "42,000건이었습니다.",
+      "answer": "42,000건입니다.",
+      "usage": {
+        "queue_time": 0.613860236,
+        "prompt_tokens": 2149,
+        "prompt_time": 0.114061975,
+        "completion_tokens": 7,
+        "completion_time": 0.015787855,
+        "total_tokens": 2156,
+        "total_time": 0.12984983
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        24,
+        25
+      ],
+      "key_facts": [
+        "42000"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "데이터 누수를 제거한 뒤 평가 정확도는 얼마로 바뀌었나요?",
+      "expected": "0.99에서 0.86으로 떨어졌습니다(이게 실제 성능).",
+      "answer": "데이터 누수를 제거한 뒤 평가 정확도는 **0.86**으로 바뀌었습니다. 기존의 정확도는 0.99였으나, 중복 제거와 재분할 이후 정확도가 0.86으로 떨어졌습니다. 이는 누수 제거 후 실제 성능을 반영하는 신뢰할 수 있는 기준선으로 간주됩니다.",
+      "usage": {
+        "queue_time": 0.005876948,
+        "prompt_tokens": 2180,
+        "prompt_time": 0.088795408,
+        "completion_tokens": 68,
+        "completion_time": 0.153996032,
+        "total_tokens": 2248,
+        "total_time": 0.24279144
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        25,
+        27
+      ],
+      "key_facts": [
+        "0.86"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "모델이 답을 너무 일찍 끝내던 토크나이저 문제의 원인과 해결책은 무엇이었나요?",
+      "expected": "pad_token이 eos_token과 같은데 라벨 마스킹을 안 해 패딩(=eos)에까지 loss가 걸린 게 원인이며, pad 토큰을 분리하고 라벨을 -100으로 마스킹(padding_side right)해 해결했습니다.",
+      "answer": "원인은 **pad_token이 eos_token과 같게 설정된 것**이었습니다. 많은 토크나이저가 pad 토큰이 따로 없으면 기본으로 `pad_token = eos_token`으로 두는데, 이 상태에서 라벨 마스킹을 안 하면 모델이 \"빨리 eos를 뱉어라\"를 학습하게 되어 답이 한두 단어 만에 끊기는 문제가 발생했습니다.\n\n해결책은 pad_token을 eos_token과 다르게 설정하고, 라벨에서 pad 위치를 마스킹(-100)하는 것입니다.",
+      "usage": {
+        "queue_time": 0.006080223,
+        "prompt_tokens": 2323,
+        "prompt_time": 0.093666216,
+        "completion_tokens": 116,
+        "completion_time": 0.264064023,
+        "total_tokens": 2439,
+        "total_time": 0.357730239
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        29,
+        31
+      ],
+      "key_facts": [
+        "eos",
+        "-100"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "LoRA를 병합한 뒤 4-bit(nf4)로 양자화했을 때 정확도는 얼마였나요?",
+      "expected": "0.83이었습니다 (bf16은 0.86).",
+      "answer": "LoRA를 병합한 뒤 4-bit(nf4)로 양자화했을 때 정확도는 0.83이었습니다. \n\n이는 bf16(양자화 안 함) 정확도 0.86보다 약 3% 포인트 떨어진 수치이며, 메모리는 bf16의 1/3 수준으로 줄어듭니다.",
+      "usage": {
+        "queue_time": 0.28675267,
+        "prompt_tokens": 2192,
+        "prompt_time": 0.102915541,
+        "completion_tokens": 73,
+        "completion_time": 0.164951359,
+        "total_tokens": 2265,
+        "total_time": 0.2678669
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        37,
+        38
+      ],
+      "key_facts": [
+        "0.83"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "추론 서빙은 무엇으로, 몇 번 포트에 띄웠나요?",
+      "expected": "vLLM으로 8001 포트에 띄웠습니다.",
+      "answer": "vLLM로, 8001 포트에 띄웠습니다.",
+      "usage": {
+        "queue_time": 0.047242384,
+        "prompt_tokens": 2363,
+        "prompt_time": 0.110914334,
+        "completion_tokens": 15,
+        "completion_time": 0.033825217,
+        "total_tokens": 2378,
+        "total_time": 0.144739551
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        39,
+        40
+      ],
+      "key_facts": [
+        "vllm",
+        "8001"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "생성이 멈추지 않고 같은 말을 반복하던 문제의 원인과 해결책은 무엇이었나요?",
+      "expected": "서빙 chat template이 학습 포맷과 달라 eos가 빠진 게 원인이며, 템플릿을 학습과 통일(eos 포함)하고 stop 토큰 지정 + repetition_penalty 1.1을 더해 해결했습니다.",
+      "answer": "원인은 두 가지입니다. 첫 번째는 학습 때 사용한 대화 템플릿과 서빙 시 적용되는 템플릿이 달랐기 때문입니다. 이로 인해 모델이 학습한 \"조기 종료\" 신호를 제대로 인식하지 못했습니다. 두 번째는 stop 토큰이 지정되지 않아 모델이 최대 토큰까지 계속 생성했다는 것입니다.\n\n해결책은 다음과 같습니다.\n\n1. **학습 때 사용한 chat template을 그대로 적용**: 학습과 추론의 포맷을 통일합니다. \n2. **추론 요청에 stop 토큰 명시**: 모델이 특정 토큰(eos)에서 멈추도록 설정합니다.\n3. **repetition_penalty 적용**: 같은 토큰 반복에 페널티를 주어 불필요한 반복을 방지합니다.\n\n특히 핵심은 **1번(템플릿+eos 통일)**이며, 2·3번은 보조 안전장치입니다.",
+      "usage": {
+        "queue_time": 0.157738454,
+        "prompt_tokens": 2337,
+        "prompt_time": 0.093922482,
+        "completion_tokens": 191,
+        "completion_time": 0.432237768,
+        "total_tokens": 2528,
+        "total_time": 0.52616025
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        41,
+        43
+      ],
+      "key_facts": [
+        "eos",
+        "repetition_penalty"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "서빙 지연을 줄이려고 최대 컨텍스트 길이(max_model_len)를 얼마로 낮췄나요?",
+      "expected": "4096에서 2048로 낮췄습니다.",
+      "answer": "4096에서 2048로 낮췄습니다. 이로 인해 KV 캐시 예약이 절반으로 줄어 동시 처리량이 올라가며, 대기 큐가 짧아져 평균 지연이 내려갑니다.",
+      "usage": {
+        "queue_time": 0.08645966,
+        "prompt_tokens": 2258,
+        "prompt_time": 0.104454857,
+        "completion_tokens": 47,
+        "completion_time": 0.106618841,
+        "total_tokens": 2305,
+        "total_time": 0.211073698
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        47,
+        49
+      ],
+      "key_facts": [
+        "4096",
+        "2048"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "체크포인트를 몇 스텝마다 저장하고, 최대 몇 개까지 보관하도록 설정했나요?",
+      "expected": "500 스텝마다 저장하고(save_steps 500), 최대 3개(save_total_limit 3)만 보관하도록 했습니다.",
+      "answer": "**500 스텝마다 저장, 최대 3개 보관**으로 설정했습니다.\n\n具体的으로는:\n\n*   save_steps = 500\n*   save_total_limit = 3\n\n으로 설정하여 500 스텝마다 체크포인트를 저장하고, 최근 3개만 보관하도록 했습니다. 이렇게 하면 디스크 공간을 효율적으로 사용할 수 있고, 학습이 중단되었을 때 최근 체크포인트에서 학습을 재개할 수 있습니다.",
+      "usage": {
+        "queue_time": 1.04860794,
+        "prompt_tokens": 2039,
+        "prompt_time": 0.108792474,
+        "completion_tokens": 92,
+        "completion_time": 0.208131266,
+        "total_tokens": 2131,
+        "total_time": 0.31692374
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        19
+      ],
+      "key_facts": [
+        "500",
+        "3"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "LoRA 어댑터를 베이스 모델에 병합(merge)하기로 한 이유와, 병합 시 dtype과 관련해 주의한 점은 무엇이었나요?",
+      "expected": "추론 시 LoRA 연산 오버헤드가 없어 빠르고 vLLM이 일반 모델로 취급할 수 있어서 병합하기로 했고, 병합 dtype은 학습 때와 같은 bf16으로 맞춰야 한다(fp16으로 병합하면 미세한 수치 차이로 성능이 흔들릴 수 있음)는 점을 주의했습니다.",
+      "answer": "LoRA 어댑터를 베이스 모델에 병합하기로 한 이유는 **추론 효율을 위해**였습니다. 이렇게 하면 **LoRA 연산 오버헤드가 없어 빠르고**, vLLM 같은 추론 엔진이 그냥 일반 모델로 취급할 수 있습니다.\n\n병합 시 dtype과 관련해 주의할 점은 **dtype을 학습 때와 맞추는 것(bf16)**입니다. fp16으로 병합하면 미세한 수치 차이로 성능이 살짝 흔들릴 수 있습니다.",
+      "usage": {
+        "queue_time": 0.479464616,
+        "prompt_tokens": 2467,
+        "prompt_time": 0.138636224,
+        "completion_tokens": 103,
+        "completion_time": 0.233088808,
+        "total_tokens": 2570,
+        "total_time": 0.371725032
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        35
+      ],
+      "key_facts": [
+        "bf16",
+        "오버헤드"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "추론 샘플링 기본값으로 temperature와 top_p를 각각 얼마로 정했나요?",
+      "expected": "temperature 0.7, top_p 0.9로 정했습니다.",
+      "answer": "기본 샘플링은 **temperature 0.7, top_p 0.9** 로 시작하는 걸 추천합니다.",
+      "usage": {
+        "queue_time": 0.12872521,
+        "prompt_tokens": 2315,
+        "prompt_time": 0.118684048,
+        "completion_tokens": 27,
+        "completion_time": 0.061061916,
+        "total_tokens": 2342,
+        "total_time": 0.179745964
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        45
+      ],
+      "key_facts": [
+        "0.7",
+        "0.9"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "4-bit 양자화 버전과 bf16 버전을 실제 서빙 조건에서 다시 비교할 때, 어떤 기준으로 결정하기로 했나요?",
+      "expected": "정확도 손실이 치명적인 용도면 bf16, 손실이 허용 범위이고 처리량/비용이 중요하면 양자화를 택하고, 애매하면 누수를 제거한 같은 평가셋으로 A/B 비교해 에러 유형까지 보고 결정하기로 했습니다.",
+      "answer": "정확도, 메모리 사용량, 지연/처리량을 기준으로 삼았습니다.\n\n- 정확도: 얼마나 정확한지\n- 메모리: 얼마나 많은 메모리를 사용하는지\n- 지연/처리량: 처리하는데 얼마나 많은 지연이 발생하고, 얼마나 많은 요청을 처리할 수 있는지\n\n이러한 기준으로 결정하기로 했습니다.",
+      "usage": {
+        "queue_time": 0.125760431,
+        "prompt_tokens": 2117,
+        "prompt_time": 0.079595094,
+        "completion_tokens": 66,
+        "completion_time": 0.150320598,
+        "total_tokens": 2183,
+        "total_time": 0.229915692
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        51
+      ],
+      "key_facts": [
+        "A/B",
+        "에러 유형"
+      ],
+      "keyfact_score": 0.0
+    },
+    {
+      "question": "다른 사람이 재현할 수 있도록 고정하기로 한 설정들은 무엇이었나요?",
+      "expected": "시드 42(random/numpy/torch/cuda 및 data_seed 포함), 데이터 분할 산출물(dedup·split 결과의 ID/해시) 저장, 라이브러리 버전 핀·베이스 모델 리비전·CUDA/드라이버 버전 등 환경 고정, 그리고 완전 결정성이 필요하면 torch.use_deterministic_algorithms(True)를 고정하기로 했습니다.",
+      "answer": "다른 사람이 재현할 수 있도록 고정하기로 한 설정들은 다음과 같습니다.\n\n1. **무작위성 고정**: 시드(seed)를 고정합니다. \n   - 코드에서는 `SEED = 42`로 설정하고, `random.seed(SEED), np.random.seed(SEED), torch.manual_seed(SEED), torch.cuda.manual_seed_all(SEED)`을 사용합니다.\n\n2. **환경 고정**: \n   - 라이브러리 버전 고정: `requirements.txt`에 정확한 버전 명시.\n   - 베이스 모델 리비전(커밋 해시) 고정.\n   - CUDA/드라이버 버전 기록.\n\n3. **데이터 분할 고정**: \n   - 데이터 분할 결과(dedup, split 결과)를 파일로 저장하여 버전 관리합니다.",
+      "usage": {
+        "queue_time": 0.118860875,
+        "prompt_tokens": 2134,
+        "prompt_time": 0.100358641,
+        "completion_tokens": 159,
+        "completion_time": 0.361075851,
+        "total_tokens": 2293,
+        "total_time": 0.461434492
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        55
+      ],
+      "key_facts": [
+        "42",
+        "data_seed"
+      ],
+      "keyfact_score": 0.5
+    },
+    {
+      "question": "데이터 분할 단계에서 쓴 시드값은 얼마였고, 재현성 확보 단계에서 그 시드를 어떻게 쓰라고 했나요?",
+      "expected": "데이터 분할(split)을 seed=42로 했고, 재현성 단계에서는 그 시드 42를 데이터 분할부터 학습까지(data_seed 포함) 일관되게 쓰라고 했습니다.",
+      "answer": "데이터 분할 단계에서 사용한 시드값은 **42**입니다.\n\n재현성 확보 단계에서는 이 시드값 **42**을 **데이터 분할부터 학습까지 일관되게** 사용하라고 했습니다. 즉, 데이터 분할에 사용한 시드값과 동일한 값을 학습 전반에 걸쳐 사용해야 합니다.\n\n특히, `data_seed`까지 고정해야 **배치 셔플 순서**도 같아진다고 했습니다.\n\n```python\nimport random, numpy as np, torch\nSEED = 42\nrandom.seed(SEED); np.random.seed(SEED)\ntorch.manual_seed(SEED); torch.cuda.manual_seed_all(SEED)\n\n# 학습 인자에도\nTrainingArguments(seed=42, data_seed=42, ...)\n```",
+      "usage": {
+        "queue_time": 0.033378925,
+        "prompt_tokens": 2150,
+        "prompt_time": 0.080614788,
+        "completion_tokens": 156,
+        "completion_time": 0.353808593,
+        "total_tokens": 2306,
+        "total_time": 0.434423381
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        23,
+        55
+      ],
+      "key_facts": [
+        "42"
+      ],
+      "keyfact_score": 1.0
+    }
+  ],
+  "vector": [
+    {
+      "question": "LoRA 어댑터의 rank와 alpha를 각각 얼마로 잡았나요?",
+      "expected": "rank 16, alpha 32로 잡았습니다.",
+      "answer": "LoRA 어댑터의 **rank(r) = 16**, **alpha = 32**으로 잡았습니다. \n\n이는 일반적인 설정으로, alpha는 보통 rank의 2배로 설정하는 관례를 따랐습니다.",
+      "usage": {
+        "queue_time": 0.206979761,
+        "prompt_tokens": 2229,
+        "prompt_time": 0.08701655,
+        "completion_tokens": 50,
+        "completion_time": 0.113046003,
+        "total_tokens": 2279,
+        "total_time": 0.200062553
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        1
+      ],
+      "key_facts": [
+        "16",
+        "32"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "학습 시 최대 시퀀스 길이를 얼마로 설정했나요?",
+      "expected": "max_seq_len 2048로 설정했습니다.",
+      "answer": "2048로 설정했습니다. 데이터 샘플의 95~99 퍼센타일 토큰 길이가 1500이면 2048로 충분하고, 잘리는 샘플이 거의 없습니다. 만약 상당수가 2048을 넘으면 늘리는 것을 고려하면 됩니다.",
+      "usage": {
+        "queue_time": 0.125536881,
+        "prompt_tokens": 2027,
+        "prompt_time": 0.104898156,
+        "completion_tokens": 58,
+        "completion_time": 0.130606125,
+        "total_tokens": 2085,
+        "total_time": 0.235504281
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        3
+      ],
+      "key_facts": [
+        "2048"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "per-device 배치와 그래디언트 누적을 곱한 유효 배치 크기는 얼마였나요?",
+      "expected": "32입니다 (per_device 4 × grad_accum 8).",
+      "answer": "유효 배치는 32입니다. \n\nper_device_batch를 4에서 2로 줄이고 grad_accum을 8에서 16으로 올리면 유효 배치 32는 그대로 유지하면서 순간 메모리만 절반으로 줄일 수 있다고 했습니다.\n\n즉, per-device 배치와 그래디언트 누적을 곱한 유효 배치 크기는 32입니다.",
+      "usage": {
+        "queue_time": 0.047530951,
+        "prompt_tokens": 1756,
+        "prompt_time": 0.086142977,
+        "completion_tokens": 77,
+        "completion_time": 0.173524522,
+        "total_tokens": 1833,
+        "total_time": 0.259667499
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        5
+      ],
+      "key_facts": [
+        "32"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "처음에 설정한 학습률과 스케줄러 종류는 무엇이었나요?",
+      "expected": "학습률 2e-4, cosine 스케줄러로 시작했습니다.",
+      "answer": "학습률은 **2e-4**이고, 스케줄러 종류는 **cosine**입니다.",
+      "usage": {
+        "queue_time": 0.138885156,
+        "prompt_tokens": 1763,
+        "prompt_time": 0.078408672,
+        "completion_tokens": 23,
+        "completion_time": 0.052013396,
+        "total_tokens": 1786,
+        "total_time": 0.130422068
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        7
+      ],
+      "key_facts": [
+        "2e-4",
+        "cosine"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "학습 손실이 초반에 튀어(spike) NaN이 난 원인과, 그걸 잡으려고 조정한 설정들은 무엇이었나요?",
+      "expected": "초기 학습률이 높고 warmup이 없던 게 원인이며, warmup_ratio 0.03 + 학습률 1e-4 하향 + bf16 전환 + max_grad_norm 1.0 클리핑으로 잡았습니다.",
+      "answer": "*   원인: 학습 시작 시점 가중치(어댑터)가 무작위여서 그래디언트가 크고, 여기에 큰 학습률(2e-4)을 곱해서 가중치가 과도하게 업데이트 되어 손실이 튀고 NaN이 발생했습니다.\n*   설정 조정:\n    *   **Warmup**: 전체 스텝의 3%만큼 학습률을 서서히 증가시켜 초반 불안정 구간을 안정화합니다.\n    *   **학습률**: 2e-4 → 1e-4로 낮춰 가중치 업데이트를 안정화합니다.\n    *   **fp16 → bf16**: 표현 범위가 더 넓은 bf16을 사용하여 큰 그래디언트에도 NaN이 발생하는 것을 방지합니다.\n    *   **max\\_grad\\_norm = 1.0**: 그래디언트 클리핑을 통해 순간적인 그래디언트 폭증을 상한선으로 차단합니다.",
+      "usage": {
+        "queue_time": 0.062803488,
+        "prompt_tokens": 2254,
+        "prompt_time": 0.084815707,
+        "completion_tokens": 203,
+        "completion_time": 0.460184409,
+        "total_tokens": 2457,
+        "total_time": 0.545000116
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        9,
+        11,
+        13
+      ],
+      "key_facts": [
+        "0.03",
+        "1e-4",
+        "bf16",
+        "1.0"
+      ],
+      "keyfact_score": 0.75
+    },
+    {
+      "question": "학습 중 OOM을 해결하려고 켠 설정은 무엇이었나요?",
+      "expected": "gradient_checkpointing을 켰습니다(bf16과 함께).",
+      "answer": "gradient_checkpointing을 켜서 OOM 문제를 해결했습니다. 추가로 per_device_batch를 4에서 2로 줄이고 grad_accum을 8에서 16으로 올리는 방법도 있었습니다.",
+      "usage": {
+        "queue_time": 0.04847262,
+        "prompt_tokens": 2130,
+        "prompt_time": 0.122469768,
+        "completion_tokens": 43,
+        "completion_time": 0.097149031,
+        "total_tokens": 2173,
+        "total_time": 0.219618799
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        15
+      ],
+      "key_facts": [
+        "gradient_checkpointing"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "평가 정확도가 0.99로 비정상적으로 높았던 원인과 그 처리 방법은 무엇이었나요?",
+      "expected": "train/test 데이터 누수(중복 샘플)가 원인이며, 정규화 후 sha1로 중복 제거한 다음 분할하도록 순서를 바꿔 해결했습니다.",
+      "answer": "평가 정확도가 0.99로 비정상적으로 높았던 원인은 **데이터 누수(data leakage)** 입니다. 모델이 평가셋의 일부를 학습셋에서 이미 본 적이 있었기 때문에, 평가에서 높은 정확도를 보인 것입니다. 이는 학습셋과 평가셋 사이에 중복된 샘플이 있었기 때문에 발생했습니다.\n\n처리 방법은 다음과 같습니다:\n\n1. **중복 제거(dedup)**: 원본 데이터에서 중복된 샘플을 제거합니다.\n2. **순서 바꾸기**: 중복 제거를 먼저 하고, 그다음에 학습셋과 평가셋으로 분할합니다. 이렇게 하면 학습셋과 평가셋 사이에 중복된 샘플이 없어집니다.\n\n이를 통해 평가 정확도가 0.86으로 떨어졌으며, 이는 신뢰할 수 있는 숫자입니다.",
+      "usage": {
+        "queue_time": 0.593671817,
+        "prompt_tokens": 1863,
+        "prompt_time": 0.114273723,
+        "completion_tokens": 162,
+        "completion_time": 0.365855382,
+        "total_tokens": 2025,
+        "total_time": 0.480129105
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        21,
+        23,
+        25
+      ],
+      "key_facts": [
+        "누수",
+        "sha1"
+      ],
+      "keyfact_score": 0.5
+    },
+    {
+      "question": "중복 제거는 무엇을 기준으로 했고, 데이터 누수로 몇 건 정도가 새어 있었나요?",
+      "expected": "정규화한 텍스트의 sha1 해시를 기준으로 했고, 약 1,800건이 train/test에 겹쳐 있었습니다.",
+      "answer": "1. **중복 제거(dedup) 기준**: 정규화(normalization) 후 SHA-1 해시(hash) 기준으로 중복을 제거했습니다. 구체적으로, 텍스트 데이터의 공백과 대소문자를 정규화한 뒤, SHA-1 해시를 계산하여 중복 샘플을 식별했습니다.\n\n2. **데이터 누수 규모**: 중복 제거 후, train과 test셋을 재분할하기 전, 약 1,800건의 중복 샘플이 있었습니다. 이는 전체 데이터 42,000건 중 중복된 샘플의 수입니다. 중복 제거 후 데이터양은 약 40,200건으로 감소했습니다.",
+      "usage": {
+        "queue_time": 0.858544892,
+        "prompt_tokens": 1808,
+        "prompt_time": 0.086672757,
+        "completion_tokens": 132,
+        "completion_time": 0.299022969,
+        "total_tokens": 1940,
+        "total_time": 0.385695726
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        23,
+        25
+      ],
+      "key_facts": [
+        "sha1",
+        "1800"
+      ],
+      "keyfact_score": 0.5
+    },
+    {
+      "question": "전체 데이터셋 규모는 몇 건이었나요?",
+      "expected": "42,000건이었습니다.",
+      "answer": "전체 데이터셋의 규모는 **42,000건**이었습니다.",
+      "usage": {
+        "queue_time": 0.20038549,
+        "prompt_tokens": 1415,
+        "prompt_time": 0.071341635,
+        "completion_tokens": 16,
+        "completion_time": 0.036040365,
+        "total_tokens": 1431,
+        "total_time": 0.107382
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        24,
+        25
+      ],
+      "key_facts": [
+        "42000"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "데이터 누수를 제거한 뒤 평가 정확도는 얼마로 바뀌었나요?",
+      "expected": "0.99에서 0.86으로 떨어졌습니다(이게 실제 성능).",
+      "answer": "데이터 누수를 제거한 뒤 평가 정확도는 **0.99에서 0.86으로** 바뀌었습니다.",
+      "usage": {
+        "queue_time": 0.114008883,
+        "prompt_tokens": 1856,
+        "prompt_time": 0.069663582,
+        "completion_tokens": 24,
+        "completion_time": 0.054426878,
+        "total_tokens": 1880,
+        "total_time": 0.12409046
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        25,
+        27
+      ],
+      "key_facts": [
+        "0.86"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "모델이 답을 너무 일찍 끝내던 토크나이저 문제의 원인과 해결책은 무엇이었나요?",
+      "expected": "pad_token이 eos_token과 같은데 라벨 마스킹을 안 해 패딩(=eos)에까지 loss가 걸린 게 원인이며, pad 토큰을 분리하고 라벨을 -100으로 마스킹(padding_side right)해 해결했습니다.",
+      "answer": "모델이 답을 너무 일찍 끝내는 문제는 토크나이저 설정과 라벨 마스킹 문제였습니다.\n\n### 원인\n\n1. **`pad_token`이 `eos_token`과 같음**: 많은 토크나이저에서 `pad_token`이 별도로 설정되어 있지 않으면, 기본적으로 `pad_token = eos_token`으로 설정됩니다.\n2. **라벨 마스킹 안 함**: 학습 데이터의 라벨에서 `pad_token` 위치를 마스킹하지 않으면, 모델은 `pad_token` 자리에까지 손실을 계산하게 됩니다.\n3. **모델의 잘못된 학습**: 이 상태에서 모델은 배치 안에서 짧은 샘플의 뒤를 `pad_token`으로 채우고, `pad_token`이 곧 `eos_token`이므로 \"정답 뒤에 `eos_token`가 잔뜩 붙은\" 데이터로 학습합니다. 이로 인해 모델은 \"빨리 `eos_token`를 뱉어라\"를 학습하게 됩니다.\n\n### 해결책\n\n1. **`pad_token`을 `eos_token`과 분리**  \n   ```python\n   if tokenizer.pad_token is None or tokenizer.pad_token == tokenizer.eos_token:\n       tokenizer.add_special_tokens({\"pad_token\": \"<|pad|>\"})\n       model.resize_token_embeddings(len(tokenizer))\n   ```\n   `pad_token`을 별도의 토큰으로 추가합니다.\n\n2. **`padding_side`를 `right`로 설정**  \n   ```python\n   tokenizer.padding_side = \"right\"\n   ```\n   학습 시 오른쪽 패딩을 사용합니다.\n\n3. **라벨 마스킹**  \n   ```python\n   labels = input_ids.clone()\n   labels[attention_mask == 0] = -100\n   ```\n   라벨 텐서에서 `pad_token` 위치에 `-100`을 설정하여 손실 계산에서 제외합니다.\n\n이러한 조치를 통해 모델이 너무 일찍 답을 끊는 문제를 해결할 수 있습니다.",
+      "usage": {
+        "queue_time": 0.673100817,
+        "prompt_tokens": 2296,
+        "prompt_time": 0.105236626,
+        "completion_tokens": 404,
+        "completion_time": 0.915671466,
+        "total_tokens": 2700,
+        "total_time": 1.020908092
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        29,
+        31
+      ],
+      "key_facts": [
+        "eos",
+        "-100"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "LoRA를 병합한 뒤 4-bit(nf4)로 양자화했을 때 정확도는 얼마였나요?",
+      "expected": "0.83이었습니다 (bf16은 0.86).",
+      "answer": "4-bit nf4로 양자화했을 때 정확도는 0.83이었습니다.",
+      "usage": {
+        "queue_time": 0.167055779,
+        "prompt_tokens": 1861,
+        "prompt_time": 0.088195038,
+        "completion_tokens": 20,
+        "completion_time": 0.045493878,
+        "total_tokens": 1881,
+        "total_time": 0.133688916
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        37,
+        38
+      ],
+      "key_facts": [
+        "0.83"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "추론 서빙은 무엇으로, 몇 번 포트에 띄웠나요?",
+      "expected": "vLLM으로 8001 포트에 띄웠습니다.",
+      "answer": "아직 정해지지 않았습니다. 이전 대화에서 모델 배포를 위해 LoRA 어댑터를 병합하는 방법에 대해 논의했으며, 모델을 4-bit 양자화하여 메모리를 절감하기로 결정했습니다. 하지만 추론 서빙을 위해 어떤 서버나 포트를 사용할지에 대해서는 구체적인 논의가 이루어지지 않았습니다.",
+      "usage": {
+        "queue_time": 0.173576374,
+        "prompt_tokens": 1921,
+        "prompt_time": 0.092307543,
+        "completion_tokens": 71,
+        "completion_time": 0.160790975,
+        "total_tokens": 1992,
+        "total_time": 0.253098518
+      },
+      "hit": 0.5,
+      "type": "single",
+      "source_turns": [
+        39,
+        40
+      ],
+      "key_facts": [
+        "vllm",
+        "8001"
+      ],
+      "keyfact_score": 0.0
+    },
+    {
+      "question": "생성이 멈추지 않고 같은 말을 반복하던 문제의 원인과 해결책은 무엇이었나요?",
+      "expected": "서빙 chat template이 학습 포맷과 달라 eos가 빠진 게 원인이며, 템플릿을 학습과 통일(eos 포함)하고 stop 토큰 지정 + repetition_penalty 1.1을 더해 해결했습니다.",
+      "answer": "원인:\n\n1. chat template이 학습 때 쓴 포맷과 달라 모델이 종료 신호를 제대로 인식하지 못함\n2. 템플릿에 eos 토큰이 포함되지 않아 모델이 멈출 지점을 찾지 못함\n3. stop 토큰이 지정되지 않아 모델이 계속 생성함\n\n해결책:\n\n1. 학습 때 사용한 chat template을 그대로 적용\n2. 추론 요청에 stop 토큰 명시(eos 토큰에서 멈춤)\n3. repetition_penalty를 1.1로 설정하여 같은 토큰 반복을 억제",
+      "usage": {
+        "queue_time": 0.355060619,
+        "prompt_tokens": 2275,
+        "prompt_time": 0.116645376,
+        "completion_tokens": 123,
+        "completion_time": 0.278573633,
+        "total_tokens": 2398,
+        "total_time": 0.395219009
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        41,
+        43
+      ],
+      "key_facts": [
+        "eos",
+        "repetition_penalty"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "서빙 지연을 줄이려고 최대 컨텍스트 길이(max_model_len)를 얼마로 낮췄나요?",
+      "expected": "4096에서 2048로 낮췄습니다.",
+      "answer": "4096에서 2048로 낮췄습니다. 이로 인해 KV 캐시 예약이 절반으로 줄어들어, 같은 GPU 메모리로 동시 처리 가능한 요청 수가 증가하여 지연 시간이 감소했습니다.",
+      "usage": {
+        "queue_time": 0.729849962,
+        "prompt_tokens": 1878,
+        "prompt_time": 0.092175506,
+        "completion_tokens": 44,
+        "completion_time": 0.100371528,
+        "total_tokens": 1922,
+        "total_time": 0.192547034
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        47,
+        49
+      ],
+      "key_facts": [
+        "4096",
+        "2048"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "체크포인트를 몇 스텝마다 저장하고, 최대 몇 개까지 보관하도록 설정했나요?",
+      "expected": "500 스텝마다 저장하고(save_steps 500), 최대 3개(save_total_limit 3)만 보관하도록 했습니다.",
+      "answer": "500 스텝마다 저장하고, 최대 3개까지 보관하도록 설정했습니다.\n\n```python\nsave_strategy      = \"steps\"\nsave_steps         = 500\nsave_total_limit   = 3\nload_best_model_at_end = True\nmetric_for_best_model  = \"eval_loss\"\n```",
+      "usage": {
+        "queue_time": 0.612440914,
+        "prompt_tokens": 1648,
+        "prompt_time": 0.071237734,
+        "completion_tokens": 63,
+        "completion_time": 0.142719659,
+        "total_tokens": 1711,
+        "total_time": 0.213957393
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        19
+      ],
+      "key_facts": [
+        "500",
+        "3"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "LoRA 어댑터를 베이스 모델에 병합(merge)하기로 한 이유와, 병합 시 dtype과 관련해 주의한 점은 무엇이었나요?",
+      "expected": "추론 시 LoRA 연산 오버헤드가 없어 빠르고 vLLM이 일반 모델로 취급할 수 있어서 병합하기로 했고, 병합 dtype은 학습 때와 같은 bf16으로 맞춰야 한다(fp16으로 병합하면 미세한 수치 차이로 성능이 흔들릴 수 있음)는 점을 주의했습니다.",
+      "answer": "LoRA 어댑터를 베이스 모델에 병합(merge)하기로 한 이유는 **추론 효율을 위해**입니다. 이렇게 하면 **LoRA 연산 오버헤드가 없어 빠르고**, vLLM 같은 추론 엔진이 그냥 일반 모델로 취급할 수 있습니다. 단점은 어댑터별로 모델 사본이 생긴다는 것입니다.\n\n병합 시 dtype과 관련해 주의할 점은 **dtype을 학습 때와 맞추는 것**입니다. 예를 들어, 학습 때와 dtype이 달라지면 미세한 수치 차이로 성능이 살짝 흔들릴 수 있습니다. 특히, fp16으로 병합하면 성능에 영향을 줄 수 있으므로 **bf16과 같은 dtype을 유지하는 것**이 좋습니다.",
+      "usage": {
+        "queue_time": 0.283481231,
+        "prompt_tokens": 2245,
+        "prompt_time": 0.092835155,
+        "completion_tokens": 151,
+        "completion_time": 0.341332601,
+        "total_tokens": 2396,
+        "total_time": 0.434167756
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        35
+      ],
+      "key_facts": [
+        "bf16",
+        "오버헤드"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "추론 샘플링 기본값으로 temperature와 top_p를 각각 얼마로 정했나요?",
+      "expected": "temperature 0.7, top_p 0.9로 정했습니다.",
+      "answer": "샘플링 기본값으로 **temperature 0.7, top_p 0.9** 로 시작하는 것을 추천합니다.\n\n- **temperature 0.7**: 다양성 조절. 낮을수록(0에 가까울수록) 결정적·반복적이고, 높을수록 창의적이지만 산만해집니다. 0.7이 일관성과 다양성의 균형점이에요.\n- **top_p 0.9**: nucleus sampling. 누적 확률 상위 90%의 토큰 중에서만 고릅니다. 꼬리쪽 이상한 토큰을 잘라내요.",
+      "usage": {
+        "queue_time": 0.051897803,
+        "prompt_tokens": 2273,
+        "prompt_time": 0.09725073,
+        "completion_tokens": 124,
+        "completion_time": 0.281243128,
+        "total_tokens": 2397,
+        "total_time": 0.378493858
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        45
+      ],
+      "key_facts": [
+        "0.7",
+        "0.9"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "4-bit 양자화 버전과 bf16 버전을 실제 서빙 조건에서 다시 비교할 때, 어떤 기준으로 결정하기로 했나요?",
+      "expected": "정확도 손실이 치명적인 용도면 bf16, 손실이 허용 범위이고 처리량/비용이 중요하면 양자화를 택하고, 애매하면 누수를 제거한 같은 평가셋으로 A/B 비교해 에러 유형까지 보고 결정하기로 했습니다.",
+      "answer": "비교 기준은 다음과 같습니다.\n\n*   **정확도**: 4-bit 양자화 버전은 정확도가 조금 낮고, bf16 버전은 더 높습니다.\n*   **메모리 사용량**: 4-bit 양자화 버전은 메모리를 크게 절감할 수 있고, bf16 버전은 더 많은 메모리를 사용합니다.\n*   **지연/처리량**: 4-bit 양자화 버전은 메모리 여유가 커서 동시 처리를 더 많이 할 수 있고, bf16 버전은 품질이 높지만 메모리 부담이 큽니다.\n\n이를 통해 판단할 때, **정확도 손실이 치명적인 용도**이면 비양자화(bf16) 버전을 사용하고, **손실이 허용 범위이고 처리량/비용이 중요**한 경우에는 4-bit 양자화 버전을 유지하는 것을 추천합니다. 만약 판단이 애매하면 두 버전을 같은 평가셋으로 돌려서 **에러가 어디서 나는지** 확인하는 것을 추천합니다.",
+      "usage": {
+        "queue_time": 0.319093118,
+        "prompt_tokens": 1504,
+        "prompt_time": 0.064301913,
+        "completion_tokens": 213,
+        "completion_time": 0.48283349,
+        "total_tokens": 1717,
+        "total_time": 0.547135403
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        51
+      ],
+      "key_facts": [
+        "A/B",
+        "에러 유형"
+      ],
+      "keyfact_score": 0.0
+    },
+    {
+      "question": "다른 사람이 재현할 수 있도록 고정하기로 한 설정들은 무엇이었나요?",
+      "expected": "시드 42(random/numpy/torch/cuda 및 data_seed 포함), 데이터 분할 산출물(dedup·split 결과의 ID/해시) 저장, 라이브러리 버전 핀·베이스 모델 리비전·CUDA/드라이버 버전 등 환경 고정, 그리고 완전 결정성이 필요하면 torch.use_deterministic_algorithms(True)를 고정하기로 했습니다.",
+      "answer": "다른 사람이 재현할 수 있도록 고정하기로 한 설정들은 다음과 같습니다.\n\n*   **무작위성 고정**: 시드 고정 (`SEED = 42`)\n*   **환경 고정**: 라이브러리 버전 고정 (`requirements.txt`에 정확한 버전 명시), 베이스 모델 리비전 고정, CUDA/드라이버 버전 기록\n*   **데이터 분할 고정**: 데이터 분할 산출물 저장(분할 결과 파일로 저장)",
+      "usage": {
+        "queue_time": 0.265316447,
+        "prompt_tokens": 1752,
+        "prompt_time": 0.097554956,
+        "completion_tokens": 94,
+        "completion_time": 0.21307888,
+        "total_tokens": 1846,
+        "total_time": 0.310633836
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        55
+      ],
+      "key_facts": [
+        "42",
+        "data_seed"
+      ],
+      "keyfact_score": 0.5
+    },
+    {
+      "question": "데이터 분할 단계에서 쓴 시드값은 얼마였고, 재현성 확보 단계에서 그 시드를 어떻게 쓰라고 했나요?",
+      "expected": "데이터 분할(split)을 seed=42로 했고, 재현성 단계에서는 그 시드 42를 데이터 분할부터 학습까지(data_seed 포함) 일관되게 쓰라고 했습니다.",
+      "answer": "데이터 분할 단계에서 사용한 시드값은 `42`입니다. \n\n재현성 확보 단계에서는 이 시드값 `42`를 데이터 분할부터 학습까지 일관되게 사용할 것을 권장하고 있습니다. \n\n이를 위해 다음과 같은 방법을 제안하고 있습니다.\n\n*   `random.seed(SEED); np.random.seed(SEED)`\n*   `torch.manual_seed(SEED); torch.cuda.manual_seed_all(SEED)`\n*   `TrainingArguments(seed=42, data_seed=42, ...)` \n\n즉, 데이터 분할에 사용한 시드값 `42`를 동일하게 설정하고, 학습 전반에 걸쳐 일관되게 사용함으로써 재현성을 확보할 수 있습니다.",
+      "usage": {
+        "queue_time": 0.406105338,
+        "prompt_tokens": 1390,
+        "prompt_time": 0.06032291,
+        "completion_tokens": 144,
+        "completion_time": 0.32589515,
+        "total_tokens": 1534,
+        "total_time": 0.38621806
+      },
+      "hit": 0.5,
+      "type": "multihop",
+      "source_turns": [
+        23,
+        55
+      ],
+      "key_facts": [
+        "42"
+      ],
+      "keyfact_score": 1.0
+    }
+  ]
+}
