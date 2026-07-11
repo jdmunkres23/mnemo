@@ -1,0 +1,396 @@
+# Phase 5-1 노트북 셀 내용 — 긴 토픽 재분할 (MVP) + 명제 추출(확장 경로)
+
+셀 타입 표기: **📝 마크다운 셀** / **💻 코드 셀**
+각 구분선(`---`) 사이 내용을 해당 타입의 셀에 붙여넣기.
+
+---
+
+📝 **마크다운 셀**
+
+```
+# Phase 5-1 — 긴 토픽 재분할 (MVP)
+
+**배경(이론 노트북 0.5절 요약):** eval_data/result/final_qa 실측 결과, vector가 baseline보다
+낮게 나온 21문항 중 6개를 까봤더니 "긴 토픽 다일루션"이 명확한 원인인 건 1~2개뿐이었다.
+그래서 이 Phase는 "vector를 무조건 baseline보다 낫게" 만드는 게 아니라, **진단된 다일루션만
+정확히 고쳐서 최소한 baseline과 동률로 만드는 것**을 목표로 좁힌다.
+
+**목표:** Groq 호출을 추가하지 않고, 이미 있는 chunk_session()/summarize_topic()을 재사용해서
+긴 토픽만 여러 조각으로 나눈다.
+
+**이 노트북을 마치면:**
+- [ ] 긴 토픽이 실제로 다일루션되는 걸 실측 데이터로 재현할 수 있다
+- [ ] chunk_session()을 토픽의 turn 범위 안에서 재사용해 sub-chunk로 나눌 수 있다
+- [ ] build_vector_index()를 수정해 sub-chunk마다 별도 요약+임베딩을 저장할 수 있다
+- [ ] (선택/확장) MVP로도 부족하면 명제 단위 추출로 넘어갈 수 있다
+
+**완성 후 연결:**
+src/indexer.py의 split_long_topic() 신규 작성 + build_vector_index() 수정
+```
+
+---
+
+💻 **코드 셀** (환경 설정)
+
+```python
+import sys, json
+sys.path.insert(0, "..")
+
+from src._groq import chat_completion, load_env_key
+from src.indexer import (
+    embed_texts, cosine_similarity, format_turns_as_text,
+    build_topics, chunk_session, summarize_topic, CHUNK_SIZE,
+)
+
+API_KEY = load_env_key()
+
+# 실제 진단 사례 축소 재현 — eval-long-001의 pos4 토픽(6751자, turn 34~49)과
+# 같은 성격: 서로 다른 사실 여러 개가 한 토픽에 뭉쳐 있음
+long_topic_session = {
+    "session_id": "test",
+    "turns": [
+        {"role": "user", "blocks": [{"type": "text", "text": "LoRA 병합하기로 한 이유랑 dtype 주의점은?"}]},
+        {"role": "assistant", "blocks": [{"type": "text",
+            "text": "추론 지연을 줄이려고 병합했습니다. dtype은 bf16으로 통일하지 않으면 정확도가 떨어져서 주의했습니다."}]},
+        {"role": "user", "blocks": [{"type": "text", "text": "4bit 양자화했을 때 정확도는?"}]},
+        {"role": "assistant", "blocks": [{"type": "text", "text": "4bit(nf4) 양자화 후 정확도는 91.2%였습니다."}]},
+        {"role": "user", "blocks": [{"type": "text", "text": "추론 서빙은 뭘로, 몇 번 포트?"}]},
+        {"role": "assistant", "blocks": [{"type": "text", "text": "vLLM으로 8000번 포트에 띄웠습니다."}]},
+        {"role": "user", "blocks": [{"type": "text", "text": "샘플링 기본값은?"}]},
+        {"role": "assistant", "blocks": [{"type": "text", "text": "temperature 0.7, top_p 0.9로 정했습니다."}]},
+    ] * 12  # 실제 6751자 규모를 흉내내기 위해 반복 (실습용 — 실제 토픽은 자연히 이 정도 길이가 됨, 직접 실행해 len(topic["text"])가 CHUNK_SIZE를 넘는지 확인)
+}
+
+topics = build_topics(long_topic_session, boundaries=[])  # 토픽 1개(전체)로 취급
+topic = topics[0]
+print(f"토픽 길이: {len(topic['text'])}자  (CHUNK_SIZE={CHUNK_SIZE})")
+```
+
+---
+
+📝 **마크다운 셀**
+
+```
+---
+## 섹션 1 — 다일루션 재현 (워밍업, 실습 없음)
+
+현재 summarize_topic()이 이 긴 토픽을 어떻게 압축하는지, 그리고 "샘플링 기본값이 뭐야?"
+같은 특정 사실 질문과 얼마나 멀어지는지 먼저 확인한다.
+```
+
+---
+
+💻 **코드 셀** (워밍업 — 긴 토픽 통짜 요약의 한계 확인)
+
+```python
+whole_summary = summarize_topic(topic["text"], API_KEY)
+print(f"토픽 전체({len(topic['text'])}자) 요약: {whole_summary}")
+
+query = "샘플링 기본값(temperature, top_p)이 뭐야?"
+vecs = embed_texts([query, whole_summary])
+print(f"질문 vs 통짜 요약 유사도: {cosine_similarity(list(vecs[0]), list(vecs[1])):.4f}")
+# 요약이 짧고 여러 사실(병합 이유, 양자화 정확도, 서빙 포트, 샘플링 값)을 다 담아야 해서
+# "샘플링 기본값"이라는 구체적 사실의 신호가 약해져 있을 가능성이 높다
+```
+
+---
+
+📝 **마크다운 셀**
+
+```
+**연결:** 이 문제를 풀기 위해 이 토픽을 여러 조각으로 나눌 것이다. 새 프롬프트나 새 Groq 호출
+종류를 만들지 않고, Phase 3의 chunk_session()과 04-1의 summarize_topic()을 그대로 재사용한다.
+
+---
+## 섹션 2 — 긴 토픽 재분할 (split_long_topic)
+
+토픽의 turn 범위만 잘라내 chunk_session()에 다시 넣는다. chunk_session()은 session 전체를
+받는 함수라, 토픽의 turn 범위만 담은 "가짜 세션"을 만들어 넘긴 뒤 반환된 turn_start/turn_end에
+원래 토픽의 turn_start만큼 offset을 더해 절대 인덱스로 되돌린다.
+
+**입력:**
+  session = {"turns": [...전체...]}
+  topic = {"text": "...", "turn_start": 34, "turn_end": 49, "position": 4}
+  max_chars = CHUNK_SIZE(기본 2000)
+
+**출력:**
+  topic["text"] 길이가 max_chars 이하 → [topic] (원본 그대로, 리스트에 담아서 반환)
+  초과 → chunk_session() 결과를 offset 보정한 여러 조각의 리스트
+  각 조각: {"text": str, "turn_start": int, "turn_end": int, "position": 부모 topic의 position}
+```
+
+---
+
+💻 **코드 셀** (워밍업 — 가짜 세션을 만들어 chunk_session() 재사용하는 패턴)
+
+```python
+# topic의 turn 범위만 잘라서 chunk_session()에 넣으면 무슨 일이 일어나는지 먼저 확인
+sub_turns = long_topic_session["turns"][topic["turn_start"]:topic["turn_end"] + 1]
+sub_session = {"turns": sub_turns}
+
+raw_chunks = chunk_session(sub_session, chunk_size=CHUNK_SIZE)
+print(f"조각 수: {len(raw_chunks)}")
+for c in raw_chunks:
+    # 주의: 이 turn_start/turn_end는 sub_session 기준 상대 인덱스 (0부터 시작)
+    print(f"  (상대) turn {c['turn_start']}~{c['turn_end']}  len={len(c['text'])}")
+```
+
+---
+
+💻 **코드 셀** (본 실습 — split_long_topic)
+
+```python
+def split_long_topic(session: dict, topic: dict, max_chars: int = CHUNK_SIZE) -> list[dict]:
+    """토픽이 max_chars보다 크면 chunk_session()을 재사용해 여러 조각으로 재분할한다.
+
+    입력:
+      session: {"turns": [...전체 세션...]}
+      topic:    build_topics()가 만든 토픽 하나
+                {"text": str, "turn_start": int, "turn_end": int, "position": int}
+      max_chars: 이 길이 이하면 나누지 않고 [topic] 그대로 반환
+
+    출력:
+      [{"text": str, "turn_start": int, "turn_end": int, "position": int}, ...]
+      turn_start/turn_end는 session 전체 기준 절대 인덱스로 보정되어 있어야 함
+
+    구현 순서:
+    1. len(topic["text"]) <= max_chars 이면 [topic] 그대로 반환
+    2. sub_turns = session["turns"][topic["turn_start"] : topic["turn_end"] + 1]
+    3. chunk_session({"turns": sub_turns}, chunk_size=max_chars) 호출 → raw_chunks
+    4. raw_chunks의 turn_start/turn_end에 topic["turn_start"]를 더해 절대 인덱스로 보정
+    5. 각 조각에 position은 부모 topic["position"] 그대로 부여
+    """
+    # TODO
+    pass
+```
+
+---
+
+💻 **코드 셀** (채점)
+
+```python
+pieces = split_long_topic(long_topic_session, topic)
+print(f"조각 수: {len(pieces)}")
+for p in pieces:
+    print(f"  turn {p['turn_start']}~{p['turn_end']}  len={len(p['text'])}  position={p['position']}")
+
+assert isinstance(pieces, list)
+assert len(pieces) >= 2, f"토픽이 CHUNK_SIZE보다 큰데 조각이 안 나뉨: {len(pieces)}개"
+for p in pieces:
+    for field in ("text", "turn_start", "turn_end", "position"):
+        assert field in p, f"필드 누락: {field}"
+    assert len(p["text"]) <= CHUNK_SIZE + 500, "조각이 여전히 너무 큼"  # 여유 약간
+assert pieces[0]["turn_start"] == topic["turn_start"], "절대 인덱스로 보정 안 됨"
+assert pieces[-1]["turn_end"] == topic["turn_end"], "마지막 조각이 토픽 끝까지 안 이어짐"
+
+# 작은 토픽은 안 나뉘어야 함
+small_topic = {"text": "짧은 토픽 텍스트", "turn_start": 0, "turn_end": 1, "position": 0}
+small_session = {"turns": long_topic_session["turns"][:2]}
+result = split_long_topic(small_session, small_topic)
+assert result == [small_topic], "작은 토픽은 그대로 반환돼야 함"
+print("✓ 통과")
+```
+
+---
+
+📝 **마크다운 셀**
+
+```
+**연결:** split_long_topic()의 결과 각 조각을 summarize_topic()에 넣으면 조각별 요약이 나온다.
+이제 다일루션이 줄었는지 섹션 1의 통짜 요약과 비교해본다.
+
+---
+## 섹션 3 — 조각별 요약이 통짜 요약보다 나은지 확인
+
+summarize_topic()은 이미 완성된 함수라 새로 만들 것 없다. split_long_topic()의 결과에
+그대로 적용하기만 하면 된다.
+```
+
+---
+
+💻 **코드 셀** (본 실습 — 조각별 요약 + 유사도 비교)
+
+```python
+piece_summaries = [summarize_topic(p["text"], API_KEY) for p in pieces]
+for p, s in zip(pieces, piece_summaries):
+    print(f"turn {p['turn_start']}~{p['turn_end']}: {s}")
+
+query = "샘플링 기본값(temperature, top_p)이 뭐야?"
+piece_vecs = embed_texts(piece_summaries)
+scores = [cosine_similarity(list(embed_texts([query])[0]), list(v)) for v in piece_vecs]
+best_score = max(scores)
+
+whole_summary = summarize_topic(topic["text"], API_KEY)
+whole_score = cosine_similarity(
+    list(embed_texts([query])[0]), list(embed_texts([whole_summary])[0])
+)
+
+print(f"\n통짜 요약 유사도: {whole_score:.4f}")
+print(f"조각별 최댓값:     {best_score:.4f}")
+
+assert best_score > whole_score, "조각별 최댓값이 통짜 요약보다 높아야 다일루션이 줄어든 것"
+print("✓ 통과 — 조각으로 나누니 특정 사실 질문에 대한 유사도가 개선됨")
+```
+
+---
+
+📝 **마크다운 셀**
+
+```
+**연결:** 이제 build_vector_index()가 각 토픽마다 split_long_topic()을 거쳐 조각별로
+summarize_topic() + embed_texts()를 적용하도록 고치면 된다. search_vector()는 지금
+그대로 둔다 — vector_index.json이 여전히 {text, summary, embedding, position, turn_start,
+turn_end} 스키마의 flat 리스트라, 토픽 하나가 엔트리 1개든 여러 개든 검색 함수 입장에서는
+차이가 없다.
+
+---
+## 섹션 4 — build_vector_index() 수정 (기존 함수 수정, 새 함수 아님)
+
+지금 여러분의 build_vector_index()는 대략 이런 형태일 것이다:
+
+    for i, t in enumerate(topics):
+        t["summary"] = summaries[i]
+        t["embedding"] = list(embeddings[i])
+
+이 부분을 아래 흐름으로 바꾼다:
+
+    entries = []
+    for t in topics:
+        pieces = split_long_topic(session, t)       # 작은 토픽이면 [t] 그대로
+        entries.extend(pieces)
+
+    summaries = [summarize_topic(e["text"], api_key) for e in entries]
+    embeddings = embed_texts(summaries)
+    for e, s, emb in zip(entries, summaries, embeddings):
+        e["summary"] = s
+        e["embedding"] = list(emb)
+
+    # entries를 vector_index.json에 저장 (topics 대신 entries)
+
+directly TODO 셀로 만들지 않은 이유: 이미 완성해서 쓰고 있는 함수를 고치는 것이라, 정답을
+그대로 드리는 것보다 위 흐름을 참고해서 직접 옮겨보시는 걸 권장합니다. 아래 채점 셀로
+결과물만 검증하세요.
+```
+
+---
+
+💻 **코드 셀** (채점 — build_vector_index() 수정 후 직접 실행해서 확인)
+
+```python
+import tempfile
+from pathlib import Path
+from src.indexer import build_vector_index  # 수정한 버전을 다시 로드했는지 확인
+
+with tempfile.TemporaryDirectory() as tmp:
+    session_dir = Path(tmp) / "test"
+    index_path = build_vector_index(long_topic_session, session_dir, API_KEY)
+    data = json.loads(index_path.read_text(encoding="utf-8"))
+
+    print(f"엔트리 수: {len(data)}")
+    for e in data:
+        print(f"  turn {e['turn_start']}~{e['turn_end']}  len(text)={len(e['text'])}  summary={e['summary'][:40]}...")
+
+    assert len(data) >= 2, "긴 토픽 하나가 여러 엔트리로 안 나뉘었으면 수정이 안 반영된 것"
+    for e in data:
+        for field in ("text", "summary", "embedding", "position", "turn_start", "turn_end"):
+            assert field in e, f"필드 누락: {field}"
+        assert len(e["embedding"]) == 1024
+
+    print("✓ 통과")
+```
+
+---
+
+📝 **마크다운 셀**
+
+```
+**연결:** 여기까지가 MVP다. eval-long-001로 실제 평가를 돌려서(`python -m evaluator --modes
+baseline,vector --qa-pairs eval_data/eval-long-001.qa_pairs.json`) 이론 노트북 0.5절에서
+확인한 실패 문항(특히 "temperature/top_p 기본값" 질문)이 고쳐지는지, 그리고 vector 전체
+평균이 baseline과 최소 동률이 되는지 확인한다.
+
+**MVP로도 부족하다면(예: 조각 하나에도 여전히 서로 다른 사실이 여러 개 남는 경우)** 아래
+확장 섹션으로 넘어간다. 부족한지 아닌지는 반드시 평가 수치로 판단하고, 미리 구현하지 않는다.
+
+---
+## 섹션 5(확장, 선택) — 명제 단위 추출 (extract_propositions)
+
+MVP 평가에서 sub-chunk 요약으로도 다일루션이 남는 게 확인된 경우에만 진행. Dense X Retrieval
+(Chen et al., 2023)의 3가지 기준(원자성/탈맥락화/최소성)을 프롬프트에 반영해, 조각을 문장
+단위 사실로 한 번 더 쪼갠다.
+
+**입력:** split_long_topic()이 만든 조각 하나의 text
+**출력:** ["사실 문장 1", "사실 문장 2", ...] — 각 문장은 맥락 없이 독립적으로 이해 가능
+Groq 실패 시 [조각_text[:200]]
+```
+
+---
+
+💻 **코드 셀** (확장, 선택 — extract_propositions)
+
+```python
+def extract_propositions(chunk_text: str, api_key: str) -> list[str]:
+    """조각 텍스트에서 원자적 명제 목록을 추출한다. (MVP로 부족할 때만 사용)
+
+    입력:
+      chunk_text: split_long_topic()이 만든 조각의 "text"
+      api_key: Groq API 키
+    출력:
+      [str, ...] — 각 항목은 맥락 없이 독립적으로 이해 가능한 문장 하나
+      Groq 실패 또는 파싱 실패 시 [chunk_text[:200]]
+
+    프롬프트 규칙:
+    - 하나의 명제 = 하나의 문장, 하나의 사실만
+    - 대명사·생략된 주어는 실제 지시 대상으로 치환
+    - 고유명사, 경로, 설정값, 에러명은 원문 그대로 포함
+    - JSON 배열로만 출력
+
+    구현 순서:
+    1. chunk_text[:4000]을 포함한 프롬프트 구성
+    2. llama-3.1-8b-instant 호출 (max_tokens=500, temperature=0.0)
+    3. content에서 JSON 배열 파싱 (content.find("[") ... content.rfind("]")+1)
+    4. 파싱 결과가 list[str]가 아니면 예외 처리
+    5. 예외 → [chunk_text[:200]]
+    """
+    # TODO (확장 경로 진행 시에만 구현)
+    pass
+```
+
+---
+
+💻 **코드 셀** (확장, 선택 — 채점)
+
+```python
+props = extract_propositions(pieces[0]["text"], API_KEY)
+print(f"추출된 명제 {len(props)}개:")
+for p in props:
+    print(f"  - {p}")
+
+assert isinstance(props, list)
+assert all(isinstance(p, str) for p in props)
+fallback = extract_propositions(pieces[0]["text"], "INVALID_KEY_XYZ")
+assert fallback == [pieces[0]["text"][:200]]
+print("✓ 통과")
+```
+
+---
+
+📝 **마크다운 셀**
+
+```
+**연결(확장 경로 채택 시):** build_vector_index()의 조각 처리 단계에서 summarize_topic()
+대신 extract_propositions()를 쓰면, 조각 하나가 여러 명제 엔트리로 다시 펼쳐진다. 스키마와
+search_vector()는 이번에도 변경 없음 — summary 자리에 명제 문장을 넣으면 된다.
+
+---
+## 스스로 정리해보기
+
+노트북 완료 후 직접 작성:
+- split_long_topic()이 chunk_session()을 그대로 재사용할 수 있었던 이유는? (두 함수가
+  기대하는 입력 형식이 왜 호환되는가)
+- 이 MVP가 "baseline과 다를 바 없다"는 이전 우려를 어떻게 피했는지, 본인 말로 설명해보기
+  (힌트: 글자 수 분할을 "언제" 쓰는가의 차이)
+- 평가 결과 MVP로 baseline과 동률이 안 됐다면, 그다음 조사할 것은 명제 추출이 아니라 다른
+  것일 수도 있다 — 이론 노트북 0.5절의 실패 케이스 표를 보고 어떤 걸 먼저 의심해야 할지
+  적어보기
+```
