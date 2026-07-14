@@ -1,0 +1,594 @@
+{
+  "baseline": [
+    {
+      "question": "매출 성장률을 예측 구간별로 각각 몇 %로 가정했나요?",
+      "expected": "1~3년차 35%, 4~5년차 20%로 가정했습니다.",
+      "answer": "1\\~3년차: 35%, 4\\~5년차: 20%입니다.",
+      "usage": {
+        "queue_time": 0.005986299,
+        "prompt_tokens": 2959,
+        "prompt_time": 0.104105034,
+        "completion_tokens": 24,
+        "completion_time": 0.054300335,
+        "total_tokens": 2983,
+        "total_time": 0.158405369
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        1,
+        2
+      ],
+      "key_facts": [
+        "35",
+        "20"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "EBIT(영업이익) 마진을 어떻게 변화시키기로 했나요?",
+      "expected": "현재 18%에서 5년차 25%로 점진 개선하는 것으로 잡았습니다.",
+      "answer": "EBIT(영업이익) 마진은 현재 18%에서 5년차 25%로 **점진적**으로 개선시키기로 했습니다. \n\n즉, 중간 연도는 **선형으로 보간**해서 증가시키며, 구체적으로는 18% → 19.75% → 21.5% → 23.25% → 25% 순으로 증가할 것입니다.",
+      "usage": {
+        "queue_time": 0.005959118,
+        "prompt_tokens": 2595,
+        "prompt_time": 0.091264466,
+        "completion_tokens": 84,
+        "completion_time": 0.189818561,
+        "total_tokens": 2679,
+        "total_time": 0.281083027
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        3
+      ],
+      "key_facts": [
+        "18",
+        "25"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "할인율(WACC)을 몇 %로 적용했나요?",
+      "expected": "11.5%로 적용했습니다.",
+      "answer": "11.5%로 적용했습니다.",
+      "usage": {
+        "queue_time": 0.006064143,
+        "prompt_tokens": 2634,
+        "prompt_time": 0.092739891,
+        "completion_tokens": 8,
+        "completion_time": 0.018050093,
+        "total_tokens": 2642,
+        "total_time": 0.110789984
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        7
+      ],
+      "key_facts": [
+        "11.5"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "1년차 현금흐름 현재가치가 과대평가된 원인은 무엇이었고 어떻게 고쳤나요?",
+      "expected": "첫 예측연도를 t=0으로 할인해 사실상 할인을 안 한 off-by-one 실수였고, 할인 지수 t를 1부터(1~5)로 고쳐 해결했습니다.",
+      "answer": "1년차 현금흐름의 현재가치가 과대평가된 원인은 **할인 시점의 오프바이원(off-by-one) 실수** 때문입니다.\n\n구체적으로는, 현금흐름을 할인할 때 첫해 현금흐름을 `t=0`으로 할인하여 과대평가되었습니다. 올바른 계산은 첫해 현금흐름을 `t=1`로 할인하는 것입니다.\n\n이를 수정하기 위해, 현금흐름을 계산하는 코드에서 `t`의 범위를 `range(1, 6)`으로 변경하여 첫해 현금흐름이 `t=1`로 할인되도록 했습니다. 이렇게 하면, 전체 기업가치가 정확하게 계산됩니다.",
+      "usage": {
+        "queue_time": 0.006173665,
+        "prompt_tokens": 2644,
+        "prompt_time": 0.092921879,
+        "completion_tokens": 145,
+        "completion_time": 0.327775216,
+        "total_tokens": 2789,
+        "total_time": 0.420697095
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        8,
+        9
+      ],
+      "key_facts": [
+        "t=1",
+        "1부터"
+      ],
+      "keyfact_score": 0.5
+    },
+    {
+      "question": "터미널 밸류는 어떤 방법으로, 영구성장률은 몇 %로 구했나요?",
+      "expected": "고든 성장 모형으로 구했고, 영구성장률 g는 2.5%를 적용했습니다.",
+      "answer": "터미널 밸류는 **고든 성장 모형(Gordon Growth Model)**을 사용했고, **영구성장률(g) = 2.5%**로 가정했습니다. 고든 성장 모형은 다음과 같습니다.\n\n$$\nTV(Year\\ 5\\ 시점) = \\frac{FCF(Year\\ 6)}{(WACC − g)}\n$$\n\n$$\nFCF(Year\\ 6) = FCF(Year\\ 5) × (1 + g)\n$$\n\n$$\ng = 2.5\\% \n$$\n\n$$\nWACC = 11.5\\%\n$$\n\n영구성장률 $g$는 장기 경제성장률(명목 GDP)을 넘지 않는 것이 원칙이며, 이 경우 2.5%는 장기 물가상승률(2% 안팎) + 약간의 실질성장을 반영한 수치입니다.",
+      "usage": {
+        "queue_time": 0.005989967,
+        "prompt_tokens": 2641,
+        "prompt_time": 0.113191694,
+        "completion_tokens": 179,
+        "completion_time": 0.404348554,
+        "total_tokens": 2820,
+        "total_time": 0.517540248
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        13
+      ],
+      "key_facts": [
+        "고든",
+        "2.5"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "기업가치(EV)에서 주주가치로 갈 때, 보유 순현금 얼마를 어떻게 반영했나요?",
+      "expected": "순현금 30억을 더했습니다 (순부채가 −30억이라 EV에 가산).",
+      "answer": "기업가치(EV)에서 주주가치(Equity Value)로 갈 때, 보유 순현금 30억을 **더해** 반영했습니다.\n\n주주가치 = 기업가치(EV) − 순부채(Net Debt)\n= EV - (-30억) \n= EV + 30억 \n\n즉, 순현금이 30억이므로, 순부채가 -30억이 되어 기업가치(EV)에 30억을 더하여 주주가치를 구했습니다.",
+      "usage": {
+        "queue_time": 0.006027199,
+        "prompt_tokens": 2645,
+        "prompt_time": 0.099255224,
+        "completion_tokens": 103,
+        "completion_time": 0.23231162,
+        "total_tokens": 2748,
+        "total_time": 0.331566844
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        16,
+        17
+      ],
+      "key_facts": [
+        "30억"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "주당가치를 계산할 때 총 주식수를 몇 주로 두었나요?",
+      "expected": "1,000만 주를 기준으로 했습니다.",
+      "answer": "1,000만 주입니다.\n\n다만, 희석 주식수(diluted shares)를 쓸 것을 권장하고 있습니다. 단순 발행주식수(1,000만 주)만 보지 말고, 스톡옵션·전환사채·RSU처럼 나중에 주식으로 바뀔 것들을 treasury stock method로 반영한 희석 기준을 쓰는 게 정확합니다. 옵션이 많은 성장기업은 이 차이가 꽤 큽니다.",
+      "usage": {
+        "queue_time": 0.005898835,
+        "prompt_tokens": 2636,
+        "prompt_time": 0.101259171,
+        "completion_tokens": 91,
+        "completion_time": 0.20619198,
+        "total_tokens": 2727,
+        "total_time": 0.307451151
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        18,
+        19
+      ],
+      "key_facts": [
+        "1000만"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "할인율이 1%p 어긋나면 기업가치가 대략 얼마나 변한다고 봤나요?",
+      "expected": "약 9~10% 변한다고 봤습니다 (WACC +1%p에 약 9% 하락).",
+      "answer": "WACC가 1%p 틀리면 기업가치가 대략 9~10% 움직입니다.",
+      "usage": {
+        "queue_time": 0.067523182,
+        "prompt_tokens": 2644,
+        "prompt_time": 0.12803808,
+        "completion_tokens": 23,
+        "completion_time": 0.052004542,
+        "total_tokens": 2667,
+        "total_time": 0.180042622
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        21
+      ],
+      "key_facts": [
+        "9~10"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "법인세율을 몇 %로 적용했고, 무차입 잉여현금흐름(FCF)을 어떤 공식으로 정의했나요?",
+      "expected": "법인세율 22%를 적용했고, FCF = NOPAT + 감가상각(D&A) − Capex − 순운전자본 증가분(ΔNWC), 여기서 NOPAT = EBIT × (1 − 0.22)로 정의했습니다.",
+      "answer": "법인세율은 22%로 적용했고, 무차입 잉여현금흐름(FCF)은 NOPAT + 감가상각(D&A) − 자본적지출(Capex) − 순운전자본 증가분(ΔNWC) 공식으로 정의했습니다. 여기서 NOPAT는 EBIT \\(\\times\\) (1 - 0.22)로 계산합니다.",
+      "usage": {
+        "queue_time": 0.005997895,
+        "prompt_tokens": 2973,
+        "prompt_time": 0.111405423,
+        "completion_tokens": 77,
+        "completion_time": 0.175280541,
+        "total_tokens": 3050,
+        "total_time": 0.286685964
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        4,
+        5
+      ],
+      "key_facts": [
+        "22",
+        "NOPAT"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "현금흐름이 연말에 몰리지 않고 한 해에 걸쳐 분산돼 들어온다고 보고 할인 시점을 반년 앞당기는 방식을 적용하면 현재가치가 대략 얼마나 달라지며, 이번 모델에서는 이 방식을 채택했나요?",
+      "expected": "현재가치가 약 3~5% 올라가며, 이번 첫 모델에서는 적용하지 않고 연말 기준(t=1~5)으로 두기로 했습니다.",
+      "answer": "mid-year convention(연중 할인)은 \"현금흐름이 연말에 한 번에 들어오는 게 아니라 1년 내내 고르게 들어온다\"는 가정을 반영하는 방법입니다.\n\n할인 지수를 0.5씩 당겨줍니다:\n\n```\n일반(연말):   t = 1, 2, 3, 4, 5\nmid-year:    t = 0.5, 1.5, 2.5, 3.5, 4.5\n```\n\n효과는 할인 기간이 반년씩 짧아지니 **현재가치가 약간(보통 3~5%) 올라가는** 방향입니다.\n\n이번 모델에서는 연말 기준으로 두었으므로, mid-year convention을 적용하지 않았습니다.",
+      "usage": {
+        "queue_time": 0.006297885,
+        "prompt_tokens": 2999,
+        "prompt_time": 0.120306296,
+        "completion_tokens": 163,
+        "completion_time": 0.369204754,
+        "total_tokens": 3162,
+        "total_time": 0.48951105
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        10,
+        11
+      ],
+      "key_facts": [
+        "3~5",
+        "연말"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "영구성장률을 2.5%로 정한 근거는 무엇이며, g의 상한을 무엇으로 봐야 한다고 했나요?",
+      "expected": "g는 장기 명목 GDP 성장률(물가상승률+실질성장률)을 넘으면 안 된다는 원칙에 따라, 물가상승률 2% 안팎에 약간의 실질성장을 더한 보수적 수치로 2.5%를 정했습니다.",
+      "answer": "영구성장률 **2.5%** 는 장기 경제성장률(명목 GDP)을 고려하여 정해졌습니다. 영구성장률 **g** 는 **장기 경제성장률(명목 GDP)** 을 넘으면 안 된다는 게 핵심 원칙입니다.\n\n* 명목 GDP 성장률 = 물가상승률 + 실질성장률\n* **2.5%** 는 대략 **장기 물가상승률(2% 안팎) + 약간의 실질성장을 반영한 수치** 로, 보수적이면서 무난한 수치입니다.\n\n일반적으로 영구성장률 **g** 는 **1.5%~3%** 범위에서 정하며, **절대 5%나 6% 같은 높은 숫자를 넣으면 안 됩니다.** 터미널 밸류가 비현실적으로 폭발하기 때문입니다.",
+      "usage": {
+        "queue_time": 0.005852064,
+        "prompt_tokens": 2650,
+        "prompt_time": 0.093299792,
+        "completion_tokens": 173,
+        "completion_time": 0.390902927,
+        "total_tokens": 2823,
+        "total_time": 0.484202719
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        14,
+        15
+      ],
+      "key_facts": [
+        "명목 GDP",
+        "2.5"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "이 모델은 예측 현금흐름과 터미널 밸류의 할인 시점 기준(연말 vs mid-year)을 최종적으로 어떻게, 왜 정했나요?",
+      "expected": "off-by-one을 고쳐 예측 현금흐름을 t=1~5(연말 기준)로 할인하기로 했고, mid-year(t=0.5,1.5…)는 현재가치를 3~5% 올리지만 첫 모델에서는 단순성을 위해 채택하지 않았으며, 터미널 밸류도 같은 연말 기준으로 (1+WACC)^5로 할인해 일관성을 맞췄습니다.",
+      "answer": "이 모델은 예측 현금흐름과 터미널 밸류의 할인 시점 기준으로 **연말**을 사용하기로 정했습니다. \n\n이는 사용자가 연말 기준으로 DCF 모델을 처음 구축했고, 복잡성을 피하기 위해 mid-year convention을 사용하지 않기로 했기 때문입니다. \n\n즉, 예측 현금흐름은 1년차부터 5년차까지 각각 연말에 발생하는 것으로 가정하고, 각 연말 현금흐름을 (1 + WACC)^t로 할인하여 현재가치를 계산합니다. \n\n이는 단순하고 일관된 접근 방식이며, 충분히 합리적인 선택입니다. 하지만 더 정확한 모델링을 위해서는 **mid-year convention**을 사용할 수도 있습니다. \n\nmid-year convention은 현금흐름이 연중 고르게 발생한다고 가정하여, 각 연도의 중간 시점에 현금흐름이 발생하는 것으로 간주하는 방법입니다. \n\n이 경우, 할인은 t = 0.5, 1.5, 2.5, 3.5, 4.5로 적용됩니다. 이 방식은 더 현실적인 현금흐름 패턴을 반영하지만, 계산이 더 복잡해질 수 있습니다. \n\n따라서, 사용자는 최종적으로 연말 기준을 선택했지만, 필요에 따라 mid-year convention을 고려할 수도 있습니다.",
+      "usage": {
+        "queue_time": 0.006147579,
+        "prompt_tokens": 2978,
+        "prompt_time": 0.104690423,
+        "completion_tokens": 265,
+        "completion_time": 0.599318131,
+        "total_tokens": 3243,
+        "total_time": 0.704008554
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        9,
+        11,
+        13
+      ],
+      "key_facts": [
+        "연말",
+        "t=1",
+        "mid-year"
+      ],
+      "keyfact_score": 0.6666666666666666
+    }
+  ],
+  "vector": [
+    {
+      "question": "매출 성장률을 예측 구간별로 각각 몇 %로 가정했나요?",
+      "expected": "1~3년차 35%, 4~5년차 20%로 가정했습니다.",
+      "answer": "**1~3년차: 연 35%**\n\n**4~5년차: 연 20%**로 가정했습니다.",
+      "usage": {
+        "queue_time": 0.005890917,
+        "prompt_tokens": 2288,
+        "prompt_time": 0.085775056,
+        "completion_tokens": 29,
+        "completion_time": 0.065480121,
+        "total_tokens": 2317,
+        "total_time": 0.151255177
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        1,
+        2
+      ],
+      "key_facts": [
+        "35",
+        "20"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "EBIT(영업이익) 마진을 어떻게 변화시키기로 했나요?",
+      "expected": "현재 18%에서 5년차 25%로 점진 개선하는 것으로 잡았습니다.",
+      "answer": "EBIT(영업이익) 마진을 현재 18%에서 5년차 25%로 **점진적으로 개선**시키기로 했습니다.",
+      "usage": {
+        "queue_time": 0.032425529,
+        "prompt_tokens": 2287,
+        "prompt_time": 0.092335728,
+        "completion_tokens": 30,
+        "completion_time": 0.067827062,
+        "total_tokens": 2317,
+        "total_time": 0.16016279
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        3
+      ],
+      "key_facts": [
+        "18",
+        "25"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "할인율(WACC)을 몇 %로 적용했나요?",
+      "expected": "11.5%로 적용했습니다.",
+      "answer": "11.5%로 적용했습니다.",
+      "usage": {
+        "queue_time": 0.020956437,
+        "prompt_tokens": 2286,
+        "prompt_time": 0.091889806,
+        "completion_tokens": 8,
+        "completion_time": 0.01814957,
+        "total_tokens": 2294,
+        "total_time": 0.110039376
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        7
+      ],
+      "key_facts": [
+        "11.5"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "1년차 현금흐름 현재가치가 과대평가된 원인은 무엇이었고 어떻게 고쳤나요?",
+      "expected": "첫 예측연도를 t=0으로 할인해 사실상 할인을 안 한 off-by-one 실수였고, 할인 지수 t를 1부터(1~5)로 고쳐 해결했습니다.",
+      "answer": "1년차 현금흐름의 현재가치가 과대평가된 원인은 **할인 시점 off-by-one 실수** 때문입니다. \n\n첫 예측연도(Year 1)의 현금흐름은 1년 뒤에 들어오니까 **t=1로 할인**해야 합니다. `(1+WACC)^0`으로 나누면 분모가 1이라 사실상 할인을 안 한 거예요. 한 해치 할인이 통째로 빠지면서 현재가치가 부풀려집니다.\n\n이를 고치기 위해 할인 지수 t는 **1부터 5까지** 돌아야 합니다. Year 1 → /(1.115)^1, Year 5 → /(1.115)^5 이런 식으로요.\n\n즉, 잘못된 코드는 `PV = sum(FCF[t] / (1+wacc)**t for t in range(0, 5))` 였고, 고친 코드는 `PV = sum(FCF[t] / (1+wacc)**t for t in range(1, 6))`입니다.",
+      "usage": {
+        "queue_time": 0.167539169,
+        "prompt_tokens": 2631,
+        "prompt_time": 0.116016297,
+        "completion_tokens": 223,
+        "completion_time": 0.505566746,
+        "total_tokens": 2854,
+        "total_time": 0.621583043
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        8,
+        9
+      ],
+      "key_facts": [
+        "t=1",
+        "1부터"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "터미널 밸류는 어떤 방법으로, 영구성장률은 몇 %로 구했나요?",
+      "expected": "고든 성장 모형으로 구했고, 영구성장률 g는 2.5%를 적용했습니다.",
+      "answer": "터미널 밸류는 **고든 성장 모형(Gordon Growth Model)**을 사용해서 구했습니다. \n\n그리고 **영구성장률(g)**은 **장기 경제성장률(명목 GDP)**을 넘지 않는 선에서, 대략 **장기 물가상승률(2% 안팎) + 약간의 실질성장을 반영한 2.5%**로 설정했습니다.",
+      "usage": {
+        "queue_time": 0.450637757,
+        "prompt_tokens": 2293,
+        "prompt_time": 0.119560917,
+        "completion_tokens": 84,
+        "completion_time": 0.189715451,
+        "total_tokens": 2377,
+        "total_time": 0.309276368
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        13
+      ],
+      "key_facts": [
+        "고든",
+        "2.5"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "기업가치(EV)에서 주주가치로 갈 때, 보유 순현금 얼마를 어떻게 반영했나요?",
+      "expected": "순현금 30억을 더했습니다 (순부채가 −30억이라 EV에 가산).",
+      "answer": "기업가치(EV)에서 주주가치로 갈 때, **순부채 조정**을 합니다. 순부채는 총차입금을 현금성 자산으로 빼서 계산하죠.\n\n그런데 이 회사는 **순현금이 30억**이라, 총차입금보다 현금이 더 많은 상태입니다. 이 경우 순부채는 -30억이 되는데, 기업가치(EV)에서 주주가치를 구할 때는 순부채를 빼는 것이기 때문에 -30억을 빼면 **30억을 더하는 효과**가 있습니다.\n\n즉, 주주가치 = 기업가치(EV) + 30억입니다.",
+      "usage": {
+        "queue_time": 0.005601486,
+        "prompt_tokens": 2560,
+        "prompt_time": 0.102414502,
+        "completion_tokens": 137,
+        "completion_time": 0.310064419,
+        "total_tokens": 2697,
+        "total_time": 0.412478921
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        16,
+        17
+      ],
+      "key_facts": [
+        "30억"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "주당가치를 계산할 때 총 주식수를 몇 주로 두었나요?",
+      "expected": "1,000만 주를 기준으로 했습니다.",
+      "answer": "1,000만주입니다. \n\n다만, 실무적으로는 희석 주식수(diluted shares)를 쓰는 것이 정확하다고 합니다. 단순 발행주식수(1,000만 주)만 보지 말고, 스톡옵션·전환사채·RSU처럼 나중에 주식으로 바뀔 것들을 treasury stock method로 반영한 희석 기준을 쓰는 게 정확합니다.",
+      "usage": {
+        "queue_time": 0.914596616,
+        "prompt_tokens": 2234,
+        "prompt_time": 0.090222212,
+        "completion_tokens": 82,
+        "completion_time": 0.185394014,
+        "total_tokens": 2316,
+        "total_time": 0.275616226
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        18,
+        19
+      ],
+      "key_facts": [
+        "1000만"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "할인율이 1%p 어긋나면 기업가치가 대략 얼마나 변한다고 봤나요?",
+      "expected": "약 9~10% 변한다고 봤습니다 (WACC +1%p에 약 9% 하락).",
+      "answer": "WACC가 1%p 틀리면 기업가치가 대략 9~10% 움직입니다.",
+      "usage": {
+        "queue_time": 0.400184025,
+        "prompt_tokens": 2296,
+        "prompt_time": 0.102308523,
+        "completion_tokens": 23,
+        "completion_time": 0.051990143,
+        "total_tokens": 2319,
+        "total_time": 0.154298666
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        21
+      ],
+      "key_facts": [
+        "9~10"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "법인세율을 몇 %로 적용했고, 무차입 잉여현금흐름(FCF)을 어떤 공식으로 정의했나요?",
+      "expected": "법인세율 22%를 적용했고, FCF = NOPAT + 감가상각(D&A) − Capex − 순운전자본 증가분(ΔNWC), 여기서 NOPAT = EBIT × (1 − 0.22)로 정의했습니다.",
+      "answer": "## 법인세율과 무차입 잉여현금흐름(FCF) 공식\n\n법인세율은 **22%**로 적용했습니다.\n\n무차입 잉여현금흐름(Unlevered Free Cash Flow, FCF)은 다음과 같은 공식으로 정의했습니다:\n\n```\nFCF = NOPAT + 감가상각(D&A) − 자본적지출(Capex) − 순운전자본 증가분(ΔNWC)\n```\n\n여기서 NOPAT는 EBIT에 법인세율을 곱한 값으로 계산했습니다:\n\n```\nNOPAT = EBIT × (1 − 0.22)\n```",
+      "usage": {
+        "queue_time": 0.005725026,
+        "prompt_tokens": 2302,
+        "prompt_time": 0.092593804,
+        "completion_tokens": 126,
+        "completion_time": 0.284419431,
+        "total_tokens": 2428,
+        "total_time": 0.377013235
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        4,
+        5
+      ],
+      "key_facts": [
+        "22",
+        "NOPAT"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "현금흐름이 연말에 몰리지 않고 한 해에 걸쳐 분산돼 들어온다고 보고 할인 시점을 반년 앞당기는 방식을 적용하면 현재가치가 대략 얼마나 달라지며, 이번 모델에서는 이 방식을 채택했나요?",
+      "expected": "현재가치가 약 3~5% 올라가며, 이번 첫 모델에서는 적용하지 않고 연말 기준(t=1~5)으로 두기로 했습니다.",
+      "answer": "mid-year convention(연중 할인)을 적용하면 현재가치가 약간 증가하는 효과가 있습니다. 일반적으로 3~5% 정도 증가한다고 합니다.\n\n이번 모델에서는 연말 기준으로 두고 시작했지만, 더 정밀한 평가가 필요해지면 mid-year convention을 적용할 수 있습니다. 중요한 것은 일관성입니다. 예측 현금흐름에 mid-year convention을 적용했으면 터미널 밸류 할인에도 같은 규칙을 적용해야 합니다.",
+      "usage": {
+        "queue_time": 0.290791177,
+        "prompt_tokens": 2663,
+        "prompt_time": 0.105728707,
+        "completion_tokens": 93,
+        "completion_time": 0.210218805,
+        "total_tokens": 2756,
+        "total_time": 0.315947512
+      },
+      "hit": 1.0,
+      "type": "paraphrase",
+      "source_turns": [
+        10,
+        11
+      ],
+      "key_facts": [
+        "3~5",
+        "연말"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "영구성장률을 2.5%로 정한 근거는 무엇이며, g의 상한을 무엇으로 봐야 한다고 했나요?",
+      "expected": "g는 장기 명목 GDP 성장률(물가상승률+실질성장률)을 넘으면 안 된다는 원칙에 따라, 물가상승률 2% 안팎에 약간의 실질성장을 더한 보수적 수치로 2.5%를 정했습니다.",
+      "answer": "영구성장률 **2.5%** 로 정한 근거는 대략 **장기 물가상승률(2% 안팎) + 약간의 실질성장을 반영**한, 보수적이면서 무난한 수치입니다.\n\n영구성장률(g)의 상한은 **장기 경제성장률(명목 GDP)**을 넘으면 안 됩니다. 논리는 g는 회사가 \"영원히\" 성장하는 속도인데, 이게 경제 전체 성장률보다 높으면 시간이 무한히 흐를수록 이 회사가 전체 경제보다 커진다는 모순이 생기기 때문입니다.",
+      "usage": {
+        "queue_time": 0.048263704,
+        "prompt_tokens": 2302,
+        "prompt_time": 0.092760154,
+        "completion_tokens": 123,
+        "completion_time": 0.277720083,
+        "total_tokens": 2425,
+        "total_time": 0.370480237
+      },
+      "hit": 1.0,
+      "type": "single",
+      "source_turns": [
+        14,
+        15
+      ],
+      "key_facts": [
+        "명목 GDP",
+        "2.5"
+      ],
+      "keyfact_score": 1.0
+    },
+    {
+      "question": "이 모델은 예측 현금흐름과 터미널 밸류의 할인 시점 기준(연말 vs mid-year)을 최종적으로 어떻게, 왜 정했나요?",
+      "expected": "off-by-one을 고쳐 예측 현금흐름을 t=1~5(연말 기준)로 할인하기로 했고, mid-year(t=0.5,1.5…)는 현재가치를 3~5% 올리지만 첫 모델에서는 단순성을 위해 채택하지 않았으며, 터미널 밸류도 같은 연말 기준으로 (1+WACC)^5로 할인해 일관성을 맞췄습니다.",
+      "answer": "이 모델은 예측 현금흐름과 터미널 밸류의 할인 시점 기준으로 **연말(t=1~5)**을 사용하기로 최종 결정했습니다.\n\n이는 기존에 **mid-year convention(연중 할인)**을 적용할 경우, 계산이 복잡해지고 일관성이 떨어질 우려가 있기 때문입니다. 또한, 연말 기준으로 계산한 경우에도 충분히 정확한 결과를 얻을 수 있기 때문에, 연말 기준을 사용하기로 했습니다.\n\n할인 시점 기준을 연말로 정했기 때문에, 현금흐름은 각 년도 말에 발생하는 것으로 가정하고, 터미널 밸류도 5년차 말에 발생하는 것으로 가정하여 계산합니다. \n\n따라서, 현금흐름과 터미널 밸류의 현재가치를 계산할 때, 각각의 현금흐름과 터미널 밸류를 해당 년도의 할인율로 할인하여 계산합니다. \n\n예를 들어, 1년차 현금흐름은 1년후에 발생하는 것이므로 `(1+WACC)^1`로 할인하고, 5년차 현금흐름과 터미널 밸류는 5년 후에 발생하는 것이므로 `(1+WACC)^5`로 할인합니다. \n\n이는 계산을 단순화하고 일관성을 유지하기 위해 연말 기준을 선택한 것입니다.",
+      "usage": {
+        "queue_time": 0.006232734,
+        "prompt_tokens": 2642,
+        "prompt_time": 0.09282215,
+        "completion_tokens": 268,
+        "completion_time": 0.605808415,
+        "total_tokens": 2910,
+        "total_time": 0.698630565
+      },
+      "hit": 1.0,
+      "type": "multihop",
+      "source_turns": [
+        9,
+        11,
+        13
+      ],
+      "key_facts": [
+        "연말",
+        "t=1",
+        "mid-year"
+      ],
+      "keyfact_score": 1.0
+    }
+  ]
+}

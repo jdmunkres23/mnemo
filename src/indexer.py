@@ -599,6 +599,36 @@ def summarize_topic(topic_text: str, api_key: str) -> str:
     except Exception:
         return topic_text[:200]
 
+def split_long_topic(session: dict, topic: dict, max_chars: int = CHUNK_SIZE) -> list[dict]:
+    """토픽이 max_chars보다 크면 chunk_session()을 재사용해 여러 조각으로 재분할한다.
+
+    입력:
+      session: {"turns": [...전체 세션...]}
+      topic:    build_topics()가 만든 토픽 하나
+                {"text": str, "turn_start": int, "turn_end": int, "position": int}
+      max_chars: 이 길이 이하면 나누지 않고 [topic] 그대로 반환
+
+    출력:
+      [{"text": str, "turn_start": int, "turn_end": int, "position": int}, ...]
+      turn_start/turn_end는 session 전체 기준 절대 인덱스로 보정되어 있어야 함
+
+    구현 순서:
+    1. len(topic["text"]) <= max_chars 이면 [topic] 그대로 반환
+    2. sub_turns = session["turns"][topic["turn_start"] : topic["turn_end"] + 1]
+    3. chunk_session({"turns": sub_turns}, chunk_size=max_chars) 호출 → raw_chunks
+    4. raw_chunks의 turn_start/turn_end에 topic["turn_start"]를 더해 절대 인덱스로 보정
+    5. 각 조각에 position은 부모 topic["position"] 그대로 부여
+    """
+    if len(topic['text']) <= max_chars:
+        return [topic]
+    sub_turns = session['turns'][topic['turn_start']: topic['turn_end'] + 1]
+    raw_chunks = chunk_session({'turns': sub_turns}, chunk_size=max_chars)
+    for chunk in raw_chunks:
+        chunk['turn_start'] += topic['turn_start']
+        chunk['turn_end'] += topic['turn_start']
+        chunk['position'] = topic['position']
+    return raw_chunks
+    
 
 def build_vector_index(session: dict, session_dir: Path, api_key: str) -> Path:
     """토픽 기반 인덱스를 빌드해 vector_index.json으로 저장한다. (노트북 04-1 섹션 3 참고)
@@ -640,14 +670,20 @@ def build_vector_index(session: dict, session_dir: Path, api_key: str) -> Path:
     session_dir.mkdir(parents=True, exist_ok=True)
     boundaries = detect_topic_boundaries(session, api_key)
     topics = build_topics(session, boundaries)
-    summaries = [summarize_topic(t['text'], api_key) for t in topics]
-    embeddings = embed_texts(summaries)
-    for i, topic in enumerate(topics):
-        topic['summary'] = summaries[i]
-        topic['embedding'] = list(embeddings[i])
-    index_path.write_text(json.dumps(topics, ensure_ascii=False), encoding='utf-8')
-    return index_path
 
+    entries = []
+    for t in topics:
+        pieces = split_long_topic(session, t)
+        entries.extend(pieces)
+
+    summaries = [summarize_topic(e['text'], api_key) for e in entries]
+    embeddings = embed_texts(summaries)
+    for e, s, emb in zip(entries, summaries, embeddings):
+        e['summary'] = s
+        e['embedding'] = list(emb)
+
+    index_path.write_text(json.dumps(entries, ensure_ascii=False), encoding='utf-8')
+    return index_path
 
 def search_vector(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
     """벡터 인덱스에서 코사인 유사도로 상위 top_k 토픽을 검색한다. (노트북 04-1 섹션 3 참고)
@@ -671,7 +707,6 @@ def search_vector(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
       ]
       유사도 내림차순 정렬. 인덱스 파일 없으면 [] 반환.
     """
-    # search() 와 동일 패턴, embedding 필드는 공유
     if not index_path.exists():
         return []
     data = json.loads(index_path.read_text(encoding='utf-8'))
@@ -679,6 +714,60 @@ def search_vector(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
     for item in data:
         item['score'] = cosine_similarity(query_vec, item['embedding'])
     return sorted(data, key=lambda x: x['score'], reverse=True)[:top_k]
+
+
+def search_vector_grouped(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
+    """search_vector()와 동일하되, entries를 원래 토픽(position) 단위로 묶어서 검색한다.
+
+    split_long_topic()으로 큰 토픽이 여러 조각(entries)으로 쪼개져 있으면, search_vector()처럼
+    조각을 개별 후보로 두고 top_k를 뽑을 경우 같은 토픽의 형제 조각끼리 순위를 경쟁하다 밀려날 수
+    있다 (토픽 8개가 조각 16개로 늘어나면 경쟁률이 2배가 되는 식). 이 함수는 조각별 유사도는
+    그대로 계산하되, 같은 position의 조각 중 최댓값을 그 토픽의 대표 점수로 삼아 원래 토픽 단위로
+    top_k를 뽑고, 선택된 토픽은 형제 조각을 turn 순서대로 재조립해 원문 전체를 반환한다
+    (검색은 조각 단위로 정밀하게, 전달은 토픽 단위로 완전하게 — Small-to-Big을 조각 단위로 확장).
+
+    입력:
+      query: "ONNX 런타임 자동 설치 여부"
+      index_path: session_dir / "vector_index.json"
+      top_k: 반환할 최대 토픽 개수 (조각 개수가 아님)
+
+    반환:
+      [
+        {
+          "text":       "[사용자]\n...",   # 같은 position의 조각들을 turn 순서로 이어붙인 토픽 원문
+          "score":      0.87,             # 그 토픽에 속한 조각들의 유사도 중 최댓값
+          "position":   0,
+          "turn_start": 0,                # 토픽 전체 범위 시작 (조각들 중 최소)
+          "turn_end":   7                 # 토픽 전체 범위 끝 (조각들 중 최대)
+        },
+        ...
+      ]
+      대표 점수 내림차순 정렬. 인덱스 파일 없으면 [] 반환.
+    """
+    if not index_path.exists():
+        return []
+    data = json.loads(index_path.read_text(encoding='utf-8'))
+    query_vec = list(embed_texts([query])[0])
+    for item in data:
+        item['score'] = cosine_similarity(query_vec, item['embedding'])
+
+    groups = {}
+    for item in data:
+        groups.setdefault(item['position'], []).append(item)
+
+    merged = []
+    for pos, pieces in groups.items():
+        pieces.sort(key=lambda p: p['turn_start'])
+        merged.append({
+            'text': '\n\n'.join(p['text'] for p in pieces),
+            'position': pos,
+            'turn_start': pieces[0]['turn_start'],
+            'turn_end': pieces[-1]['turn_end'],
+            'score': max(p['score'] for p in pieces),
+        })
+
+    return sorted(merged, key=lambda x: x['score'], reverse=True)[:top_k]
+
 
 
 # ── Phase 4: 쿼리 분류 ────────────────────────────────────────────────────────
