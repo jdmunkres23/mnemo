@@ -685,7 +685,6 @@ def build_vector_index(session: dict, session_dir: Path, api_key: str) -> Path:
     index_path.write_text(json.dumps(entries, ensure_ascii=False), encoding='utf-8')
     return index_path
 
-
 def search_vector(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
     """벡터 인덱스에서 코사인 유사도로 상위 top_k 토픽을 검색한다. (노트북 04-1 섹션 3 참고)
 
@@ -708,7 +707,6 @@ def search_vector(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
       ]
       유사도 내림차순 정렬. 인덱스 파일 없으면 [] 반환.
     """
-    # search() 와 동일 패턴, embedding 필드는 공유
     if not index_path.exists():
         return []
     data = json.loads(index_path.read_text(encoding='utf-8'))
@@ -716,6 +714,60 @@ def search_vector(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
     for item in data:
         item['score'] = cosine_similarity(query_vec, item['embedding'])
     return sorted(data, key=lambda x: x['score'], reverse=True)[:top_k]
+
+
+def search_vector_grouped(query: str, index_path: Path, top_k: int = 3) -> list[dict]:
+    """search_vector()와 동일하되, entries를 원래 토픽(position) 단위로 묶어서 검색한다.
+
+    split_long_topic()으로 큰 토픽이 여러 조각(entries)으로 쪼개져 있으면, search_vector()처럼
+    조각을 개별 후보로 두고 top_k를 뽑을 경우 같은 토픽의 형제 조각끼리 순위를 경쟁하다 밀려날 수
+    있다 (토픽 8개가 조각 16개로 늘어나면 경쟁률이 2배가 되는 식). 이 함수는 조각별 유사도는
+    그대로 계산하되, 같은 position의 조각 중 최댓값을 그 토픽의 대표 점수로 삼아 원래 토픽 단위로
+    top_k를 뽑고, 선택된 토픽은 형제 조각을 turn 순서대로 재조립해 원문 전체를 반환한다
+    (검색은 조각 단위로 정밀하게, 전달은 토픽 단위로 완전하게 — Small-to-Big을 조각 단위로 확장).
+
+    입력:
+      query: "ONNX 런타임 자동 설치 여부"
+      index_path: session_dir / "vector_index.json"
+      top_k: 반환할 최대 토픽 개수 (조각 개수가 아님)
+
+    반환:
+      [
+        {
+          "text":       "[사용자]\n...",   # 같은 position의 조각들을 turn 순서로 이어붙인 토픽 원문
+          "score":      0.87,             # 그 토픽에 속한 조각들의 유사도 중 최댓값
+          "position":   0,
+          "turn_start": 0,                # 토픽 전체 범위 시작 (조각들 중 최소)
+          "turn_end":   7                 # 토픽 전체 범위 끝 (조각들 중 최대)
+        },
+        ...
+      ]
+      대표 점수 내림차순 정렬. 인덱스 파일 없으면 [] 반환.
+    """
+    if not index_path.exists():
+        return []
+    data = json.loads(index_path.read_text(encoding='utf-8'))
+    query_vec = list(embed_texts([query])[0])
+    for item in data:
+        item['score'] = cosine_similarity(query_vec, item['embedding'])
+
+    groups = {}
+    for item in data:
+        groups.setdefault(item['position'], []).append(item)
+
+    merged = []
+    for pos, pieces in groups.items():
+        pieces.sort(key=lambda p: p['turn_start'])
+        merged.append({
+            'text': '\n\n'.join(p['text'] for p in pieces),
+            'position': pos,
+            'turn_start': pieces[0]['turn_start'],
+            'turn_end': pieces[-1]['turn_end'],
+            'score': max(p['score'] for p in pieces),
+        })
+
+    return sorted(merged, key=lambda x: x['score'], reverse=True)[:top_k]
+
 
 
 # ── Phase 4: 쿼리 분류 ────────────────────────────────────────────────────────
