@@ -61,7 +61,7 @@ project-root/
 │   ├── phase2/            서버 + 뷰어 실습
 │   ├── phase3/            baseline RAG + 평가 실습
 │   ├── phase4/            벡터 검색 실습
-│   ├── phase5/            명제 단위(Dense X) 임베딩 실습
+│   ├── phase5/            토픽 분할 + 그룹핑 검색 실습 (명제 단위 임베딩 계획했으나 MVP로 완료 기준 충족해 보류)
 │   └── phase6/            점진적 개선 실습 (인접 게이팅, KG)
 │   (각 phase 폴더: [주제]_theory.md + [번호]_[주제]_notebook.md, AI 무관 영역은 _overview.md)
 ├── conversations_learning/       변환된 세션 데이터 (gitignore)
@@ -150,13 +150,21 @@ Phase 4 — vector
   토픽 기반 청크 분할 + 요약 임베딩 + fastembed 벡터 검색 → 관련 청크 → Groq → 답변
   평가: baseline 대비 Hit Rate + Correctness + Token Usage 비교
     ↓
-Phase 5 — dense_x
-  vector의 토픽 압축 희석 문제(큰 토픽이 요약 하나로 뭉개짐) 근본 수정
-  평가: vector 대비 paraphrase/single Hit Rate 비교
+Phase 5 — 토픽 분할(split_long_topic) + 그룹핑 검색(search_vector_grouped)
+  vector의 토픽 압축 희석 문제(큰 토픽이 요약 하나로 뭉개짐) 근본 수정.
+  원래 계획은 명제 단위(Dense X) 임베딩이었으나, MVP 우선 원칙에 따라 기존
+  chunk_session()을 재사용한 재분할로 먼저 시도 → 완료 기준을 만족해 propositions는 보류.
+  분할 직후 부작용(형제 조각끼리 top_k 경쟁 → single 타입 hit rate 하락) 발견 →
+  position 단위로 그룹핑해 대표 점수는 조각 중 최댓값, 전달은 토픽 전체로 재조립.
+  평가(3회 반복, 인덱스 고정): baseline 대비 Hit Rate 완전 회복 + Correctness +0.3 이상 → 채택
+  알려진 트레이드오프: 토큰 사용량 baseline 대비 최대 +81% (긴 대화)
     ↓
 Phase 6 — vector_adjacent → vector_kg (greedy sequential)
   인접 게이팅 추가 → 평가 → 개선되면 채택
-  벡터 KG 추가   → 평가 → 개선되면 채택 (dense_x 위에서 재평가)
+  벡터 KG 추가   → 평가 → 개선되면 채택 (분할된 vector, 즉 search_vector() flat 위에서 재평가)
+  vector_kg 목표 두 가지: ① 원래 목적인 동의어 매칭 ② vector_grouped는 토큰
+  비효율적이라 채택 보류했으므로, KG로 그 정확도를 flat 위에서 토큰 효율적으로
+  재현할 수 있는지 검증 (vector_grouped는 비교 기준점으로 유지)
     ↓
 Phase 7 — hyde (선택)
   Phase 6 평가 결과에서 개선 여지가 있을 때만 구현
@@ -191,10 +199,13 @@ session.json
       fallback: 글자 수 기준 균등 분할
   → buildTopics()
       경계로 Q&A 그룹화 → 청크별 Groq 요약 (llama-3.1-8b-instant, 2~3문장)
-  → fastembed.embed(summary)
+  → splitLongTopics() (Phase 5~)
+      CHUNK_SIZE(2000자) 넘는 토픽을 chunk_session() 재사용해 여러 조각(entries)으로 재분할
+      (새 Groq 호출 종류 추가 없음 — 기존 함수 재사용). 분할된 조각들은 같은 position을 공유.
+  → 각 entry별 Groq 요약 + fastembed.embed(summary)
       multilingual-e5-large, ONNX CPU 추론
-  → session_index.json 저장
-      { summary, embedding, position, turn_start, turn_end }
+  → vector_index.json 저장
+      { text, summary, embedding, position, turn_start, turn_end }
   → KG 빌드 (백그라운드, Phase 6~)
       청크별 엔티티/관계 추출 → knowledge_graph.db
 ```
@@ -262,7 +273,7 @@ relations          — source_name, relation, target_name, topic_idx
 엔티티 타입: `concept | error | tool | path | config | term`
 관계 타입: `uses | requires | defines | resolves | leads_to | relates_to`
 
-### Dense X 명제 모드 (Phase 5)
+### 토픽 분할 + 그룹핑 검색 (Phase 5)
 
 Phase 4 vector 평가에서 QA 표본을 늘릴수록 baseline보다 낮게 나온 원인 진단 결과,
 토픽 경계 탐지가 관대해 토픽 하나에 여러 사실이 뭉치고(예: 6751자/6개 사실짜리
@@ -270,15 +281,51 @@ Phase 4 vector 평가에서 QA 표본을 늘릴수록 baseline보다 낮게 나�
 Phase 6(선택)이었으나, 인접 게이팅·KG(현 Phase 6)보다 먼저 이 근본 원인을
 고치기로 순서 변경.
 
-```
-청크 → Groq로 원자적 명제 추출 → 명제별 fastembed 임베딩
-session_index.json에 propositions[] 배열로 추가 저장 (topics[] 병존)
+원래 계획은 명제 단위(Dense X) 임베딩(Groq로 원자적 명제 추출)이었으나, MVP 우선
+원칙에 따라 더 가벼운 방식을 먼저 시도:
+
+**1. `split_long_topic()`** — 새 Groq 호출 없이 기존 `chunk_session()`을 재사용해
+`CHUNK_SIZE`를 넘는 토픽만 여러 조각으로 재분할. 조각별로 독립 요약 + 임베딩.
+
+**2. 부작용 발견** — 조각(entries) 수가 늘면서 `search_vector()`가 조각 단위 flat
+리스트에서 top_k를 뽑다 보니, 같은 토픽에서 쪼개진 형제 조각끼리 순위를 경쟁하다
+밀려나는 현상 발생 (예: 토픽 8개→조각 16개면 top_k=3 경쟁률이 2배). `single` 타입
+질문의 Hit Rate가 baseline 대비 하락.
+
+**3. `search_vector_grouped()`로 해결** — 조각별 유사도는 그대로 계산하되
+`position`(원래 토픽) 단위로 그룹핑해 그룹 내 최댓값을 대표 점수로 사용. 선택된
+그룹은 형제 조각을 turn 순서로 재조립해 토픽 전체 원문을 LLM에 전달. 검색은 조각
+단위로 정밀하게, 전달은 토픽 단위로 완전하게 (Small-to-Big을 조각 단위로 확장).
+
+```python
+# indexer.py search_vector_grouped() 핵심 로직
+groups = {}
+for item in data:
+    groups.setdefault(item['position'], []).append(item)
+
+merged = []
+for pos, pieces in groups.items():
+    pieces.sort(key=lambda p: p['turn_start'])
+    merged.append({
+        'text': '\n\n'.join(p['text'] for p in pieces),   # 형제 조각 재조립
+        'position': pos,
+        'turn_start': pieces[0]['turn_start'],
+        'turn_end': pieces[-1]['turn_end'],
+        'score': max(p['score'] for p in pieces),          # 대표 점수 = 최댓값
+    })
 ```
 
-명제 추출 프롬프트 원칙:
-- 각 사실은 맥락 없이 독립적으로 이해 가능
-- 고유명사·경로·에러명은 원문 그대로 포함
-- 하나의 사실 = 하나의 문장
+**평가 결과** (3회 반복, 인덱스 고정해 답변 생성 노이즈만 비교): Hit Rate가 두
+세션 모두 baseline 이상으로 완전 회복, Correctness도 baseline 대비 +0.3 이상
+(long +0.48, short +0.51) — 채택 기준 통과. 단, 긴 대화에서 토큰 사용량이
+baseline 대비 +81% — 그룹핑된 토픽 원문 전체를 전달하기 때문. propositions는
+이 MVP로 완료 기준을 만족해 구현 보류.
+
+**구현 상태**: `search_vector()`(flat, 분할만)가 현재 `route_query()`가 쓰는
+라이브 경로. `search_vector_grouped()`는 구현·평가 완료했으나 evaluator CLI
+모드나 route_query()에는 아직 연결 안 됨 — Phase 6 벡터 KG에서 flat 위에 KG를
+얹어 그룹핑 수준 정확도를 토큰 효율적으로 재현하는 것이 목표 중 하나라, 그룹핑은
+비교 기준점으로 남겨두고 실제 다음 개발은 flat 위에서 진행.
 
 ### HyDE (Phase 7, 선택)
 
@@ -314,7 +361,7 @@ session_index.json에 propositions[] 배열로 추가 저장 (topics[] 병존)
 ### retrieval 경로
 
 ```
-벡터 검색: 질문 임베딩 → 코사인 유사도 top_k=3
+벡터 검색: 질문 임베딩 → 코사인 유사도 top_k=3 (search_vector(), flat — 분할된 조각 단위)
            + 인접 게이팅 (유사도 > 0.3인 ±1 토픽만 추가, Phase 6~)
 KG 검색:  엔티티 벡터 유사도 → 매칭 엔티티의 1홉 관계 자동 포함 (Phase 6~)
 
@@ -363,14 +410,14 @@ QA 쌍 스키마 (`eval_data/eval-*.qa_pairs.json`):
 
 ### 평가 모드
 
-| 모드 | 도입 Phase | 검색 방식 |
-|------|-----------|----------|
-| `baseline` | Phase 3 | 고정 크기 청크 + 벡터 검색 |
-| `vector` | Phase 4 | 토픽 기반 청크 + 벡터 검색 |
-| `dense_x` | Phase 5 | 명제 단위 벡터 검색 |
-| `vector_adjacent` | Phase 6 | vector + 인접 게이팅 |
-| `vector_kg` | Phase 6 | vector_adjacent + 벡터 KG |
-| `hyde` | Phase 7 | HyDE 쿼리 확장 + vector |
+| 모드 | 도입 Phase | 검색 방식 | 구현 상태 |
+|------|-----------|----------|----------|
+| `baseline` | Phase 3 | 고정 크기 청크 + 벡터 검색 | 구현됨 (`run_baseline`) |
+| `vector` | Phase 4~5 | 토픽 기반 청크(긴 토픽은 `split_long_topic()`으로 재분할) + 조각 단위 flat 벡터 검색 | 구현됨 (`run_vector`), route_query() 라이브 경로 |
+| `vector_grouped` | Phase 5 | vector + `search_vector_grouped()` (position 단위 그룹핑, 채택된 비교 기준점) | 함수 구현·평가 완료, evaluator CLI 모드 미연결 |
+| `vector_adjacent` | Phase 6 | vector + 인접 게이팅 | 미구현 |
+| `vector_kg` | Phase 6 | vector_adjacent + 벡터 KG (vector_grouped 수준 정확도를 토큰 효율적으로 재현이 목표) | 미구현 |
+| `hyde` | Phase 7 | HyDE 쿼리 확장 + vector | 미구현 |
 
 ### 평가 지표
 
@@ -502,20 +549,27 @@ Phase 4.5  토픽 경계 탐지 안정성 개선 (실사용 중 발견)
            자기일관성 다수결로 안정화
          긴 사용자 메시지 요약 + 긴 대화(30개 초과) 윈도우 분할·이음매 유사도 병합 추가
 
-Phase 5  Dense X (명제 단위 임베딩) — vector 저하 원인 수정
+Phase 5  토픽 분할 + 그룹핑 검색 — vector 저하 원인 수정
          평가에서 vector가 QA 표본을 늘릴수록 baseline보다 낮게 나옴을 확인 →
          원인: 토픽 경계 탐지가 관대해 토픽 하나에 여러 사실이 뭉치고(예: 6751자/
          6개 사실), 이를 2~3문장 요약으로 압축하며 개별 사실이 희석됨
-         → 토픽 원문을 원자적 명제로 쪼개 각각 임베딩 (topics[]는 Small-to-Big
-         답변용으로 병존)
-         평가: vector 대비 paraphrase/single Hit Rate 비교
+         → 원래 계획(명제 단위 임베딩) 대신 MVP로 먼저 시도: split_long_topic()으로
+         큰 토픽만 chunk_session() 재사용해 재분할 (새 Groq 호출 없음)
+         → 부작용: 조각 수 증가로 top_k 경쟁이 빡빡해져 single 타입 Hit Rate 하락
+         → search_vector_grouped() 추가: position 단위로 그룹핑해 대표 점수는
+         조각 중 최댓값, 전달은 형제 조각을 재조립한 토픽 전체 (Small-to-Big 확장)
+         평가(3회 반복): baseline 대비 Hit Rate 완전 회복 + Correctness +0.3 이상
+         → 완료 기준 충족, 명제 단위 임베딩은 보류. 단 토큰 사용량 +81%(긴 대화) 트레이드오프
          (원래 Phase 6이었으나 인접 게이팅·KG보다 먼저 진행 — 핵심 설계 원칙 7 참고)
 
 Phase 6  점진적 개선 + 평가 (greedy sequential)
          인접 게이팅 추가 → 평가 → 채택 여부 결정
          벡터 KG 추가   → 평가 → 채택 여부 결정
-         (dense_x 위에서 재평가 — KG의 동의어 매칭 역할이 dense_x와 겹쳐 순서가
-         바뀌면 효과가 왜곡될 수 있음)
+         (분할된 vector, 즉 search_vector() flat 위에서 재평가)
+         vector_kg 목표 두 가지: ① 원래 목적인 동의어 매칭 ② vector_grouped는
+         정확하지만 토큰 비효율적이라 채택 보류했으므로, KG로 그 정확도를 flat
+         위에서 토큰 효율적으로 재현할 수 있는지 검증 (vector_grouped는 비교
+         기준점/정확도 상한선으로 유지)
 
 Phase 7  실험적 기법 (Phase 6 결과 기반으로 필요한 것만)
          HyDE (가상 문서 쿼리 확장)
